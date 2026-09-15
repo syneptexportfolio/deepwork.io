@@ -4,6 +4,7 @@ import { Habit, Task, WeeklyGoal } from '../services/api';
 import { DailyTaskVisualizer } from './visualizers/DailyTaskVisualizer';
 import { WeeklyGoalVisualizer } from './visualizers/WeeklyGoalVisualizer';
 import { MonthlyHabitVisualizer } from './visualizers/MonthlyHabitVisualizer';
+import { normalizeHabitDays, WEEK_DAYS_CONFIG } from './modals/HabitModal';
 
 interface TasksProps {
   tasks: Task[];
@@ -478,32 +479,37 @@ export const Tasks: React.FC<TasksProps> = ({
                           <span>{habit.frequency_value || 3}x / week</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, dIdx) => {
-                              const isActiveDay = habit.active_days && habit.active_days.includes(day);
-                              return (
-                                <span
-                                  key={dIdx}
-                                  className={`w-5 h-5 rounded-md text-[9px] font-mono flex items-center justify-center font-bold ${
-                                    isActiveDay ? 'bg-white/15 text-white' : 'text-white/20'
-                                  }`}
-                                >
-                                  {day}
-                                </span>
-                              );
-                            })}
-                          </div>
-                          <span className="text-[10px] font-mono text-luma-text-dim">
-                            {habit.active_days?.length === 7
-                              ? 'Daily'
-                              : habit.active_days?.length === 5 && !habit.active_days.includes('S')
-                              ? 'Weekdays'
-                              : habit.active_days?.length === 2 && habit.active_days.every(d => d === 'S')
-                              ? 'Weekends'
-                              : `${habit.active_days?.length || 0}d/wk`}
-                          </span>
-                        </div>
+                        (() => {
+                          const normalized = normalizeHabitDays(habit.active_days);
+                          const isDaily = normalized.length === 7;
+                          const isWeekdays = normalized.length === 5 && !normalized.includes('Sat') && !normalized.includes('Sun');
+                          const isWeekends = normalized.length === 2 && normalized.includes('Sat') && normalized.includes('Sun');
+                          const cadenceLabel = isDaily ? 'Daily' : isWeekdays ? 'Weekdays' : isWeekends ? 'Weekends' : `${normalized.length}d/wk`;
+
+                          return (
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
+                                {WEEK_DAYS_CONFIG.map((dayItem) => {
+                                  const isActiveDay = normalized.includes(dayItem.key);
+                                  return (
+                                    <span
+                                      key={dayItem.key}
+                                      title={dayItem.name}
+                                      className={`w-5 h-5 rounded-md text-[9px] font-mono flex items-center justify-center font-bold ${
+                                        isActiveDay ? 'bg-white/15 text-white' : 'text-white/20'
+                                      }`}
+                                    >
+                                      {dayItem.label}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                              <span className="text-[10px] font-mono text-luma-text-dim">
+                                {cadenceLabel}
+                              </span>
+                            </div>
+                          );
+                        })()
                       )}
                     </div>
                   </div>

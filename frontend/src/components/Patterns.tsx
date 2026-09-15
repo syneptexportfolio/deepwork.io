@@ -1,5 +1,5 @@
-import React from 'react';
-import { Calendar, Quote, TrendingUp, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import { Calendar, Quote, TrendingUp, Sparkles, ChevronDown, Check } from 'lucide-react';
 import { StatsResponse } from '../services/api';
 import { NavTab } from './Layout';
 
@@ -46,6 +46,9 @@ function buildSmoothPath(points: { x: number; y: number }[]): string {
 }
 
 export const Patterns: React.FC<PatternsProps> = ({ stats, onSelectTab, onOpenShapeMyDay }) => {
+  const [selectedRange, setSelectedRange] = useState<'7' | '14' | '30'>('30');
+  const [isRangeMenuOpen, setIsRangeMenuOpen] = useState(false);
+
   const defaultHeatmap = [
     { period: 'Morning', days: [0, 0, 0, 0, 0, 0, 0] },
     { period: 'Afternoon', days: [0, 0, 0, 0, 0, 0, 0] },
@@ -71,8 +74,14 @@ export const Patterns: React.FC<PatternsProps> = ({ stats, onSelectTab, onOpenSh
   const afternoonPercent = stats?.patterns?.afternoonPercent ?? 0;
   const hasFocusActivity = morningPercent > 0 || afternoonPercent > 0 || hasHeatmapData;
 
-  // 30-Day Trend calculation
-  const trendPoints = stats?.patterns?.trendPoints || [];
+  // Trend calculation sliced by selectedRange
+  const rawTrendPoints = stats?.patterns?.trendPoints || [];
+  const trendPoints = selectedRange === '7'
+    ? rawTrendPoints.slice(-7)
+    : selectedRange === '14'
+    ? rawTrendPoints.slice(-14)
+    : rawTrendPoints;
+
   const hasTrendData = trendPoints.some((p) => p.value > 0);
 
   const mappedTrendPoints = trendPoints.map((tp, idx) => {
@@ -104,11 +113,45 @@ export const Patterns: React.FC<PatternsProps> = ({ stats, onSelectTab, onOpenSh
           </p>
         </div>
 
-        {/* Date Range Dropdown */}
-        <button className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-luma-card border border-luma-card-border hover:bg-white/[0.04] text-xs font-medium text-white transition-all">
-          <Calendar className="w-3.5 h-3.5 text-luma-text-muted" />
-          <span>Last 30 days</span>
-        </button>
+        {/* Interactive Date Range Dropdown */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setIsRangeMenuOpen(prev => !prev)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-luma-card border border-luma-card-border hover:bg-white/[0.04] text-xs font-medium text-white transition-all shadow-sm"
+          >
+            <Calendar className="w-3.5 h-3.5 text-luma-text-muted" />
+            <span>Last {selectedRange} days</span>
+            <ChevronDown className="w-3.5 h-3.5 text-luma-text-dim" />
+          </button>
+
+          {isRangeMenuOpen && (
+            <div className="absolute right-0 mt-2 w-44 bg-luma-card border border-luma-card-border rounded-2xl p-1.5 shadow-2xl z-20 space-y-1">
+              {[
+                { id: '7', label: 'Last 7 days' },
+                { id: '14', label: 'Last 14 days' },
+                { id: '30', label: 'Last 30 days' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedRange(opt.id as any);
+                    setIsRangeMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors ${
+                    selectedRange === opt.id
+                      ? 'bg-white/10 text-white font-medium'
+                      : 'text-luma-text-dim hover:text-white hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <span>{opt.label}</span>
+                  {selectedRange === opt.id && <Check className="w-3.5 h-3.5 text-luma-lime" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Top Two Cards: Heatmap & Insight */}

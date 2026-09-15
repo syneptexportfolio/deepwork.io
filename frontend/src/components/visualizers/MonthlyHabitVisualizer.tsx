@@ -103,7 +103,7 @@ export const MonthlyHabitVisualizer: React.FC<MonthlyHabitVisualizerProps> = ({ 
     const daysElapsed = calendarData.todayDate;
     if (daysElapsed <= 0) return 0;
     const cappedAvg = Math.min(daysElapsed, averageStreak);
-    return Math.min(100, Math.max(10, Math.round((cappedAvg / daysElapsed) * 100)));
+    return Math.min(100, Math.max(0, Math.round((cappedAvg / daysElapsed) * 100)));
   }, [activeHabits, averageStreak, calendarData.todayDate]);
 
   return (

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { Env, Task } from '../types';
+import { getTodayIST } from './schedule';
 
 export const statsRouter = new Hono<{ Bindings: Env }>();
 
@@ -15,17 +16,18 @@ statsRouter.get('/', async (c) => {
     ).all<any>();
     const scheduleRows = allSchedules || [];
 
-    // Today's or latest schedule
-    const latestSched = scheduleRows.length > 0 ? scheduleRows[scheduleRows.length - 1] : null;
+    // Prioritize today's schedule in IST, otherwise latest schedule
+    const todayStr = getTodayIST();
+    const activeSched = scheduleRows.find(s => s.date === todayStr) || (scheduleRows.length > 0 ? scheduleRows[scheduleRows.length - 1] : null);
 
     let focusMinutes = 0;
     let doneCount = 0;
     let totalCount = 0;
     let nextSession = '10:30';
 
-    if (latestSched && latestSched.generated_plan) {
+    if (activeSched && activeSched.generated_plan) {
       try {
-        const blocks: any[] = JSON.parse(latestSched.generated_plan);
+        const blocks: any[] = JSON.parse(activeSched.generated_plan);
         const activeBlocks = blocks.filter(b => b.type !== 'break');
         const doneBlocks = activeBlocks.filter(b => b.status === 'done');
         const nextPending = activeBlocks.find(b => b.status === 'pending');
@@ -67,12 +69,13 @@ statsRouter.get('/', async (c) => {
       nextSession = 'None scheduled';
     }
 
-    // Dynamic Weekly Pattern (Mon - Sun of current week)
-    const now = new Date();
-    const dayOfWeek = now.getDay();
+    // Dynamic Weekly Pattern (Mon - Sun of current week aligned to IST)
+    const nowUtc = new Date();
+    const nowIst = new Date(nowUtc.getTime() + (nowUtc.getTimezoneOffset() * 60000) + (3600000 * 5.5));
+    const dayOfWeek = nowIst.getDay();
     const distToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + distToMonday);
+    const monday = new Date(nowIst);
+    monday.setDate(nowIst.getDate() + distToMonday);
 
     const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
     const scheduleByDate = new Map<string, any[]>();

@@ -219,6 +219,12 @@ export const App: React.FC = () => {
       const res = await api.updateWeeklyGoal(id, { completed_units: currentCompleted + 1 });
       if (res.weeklyGoal) {
         setWeeklyGoals(prev => prev.map(wg => wg.id === id ? res.weeklyGoal : wg));
+        if (res.weeklyGoal.goal_id) {
+          try {
+            const goalsRes = await api.getGoals();
+            if (goalsRes.goals) setGoals(goalsRes.goals);
+          } catch {}
+        }
       }
     } catch (err) {
       console.error('Failed to update weekly goal progress:', err);

@@ -86,8 +86,41 @@ const TEMPLATES = [
 ];
 
 const PRESET_UNITS = ['steps', 'Liters', 'glasses', 'pages', 'reps', 'km', 'chapters', 'custom'];
-const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-const DAY_FULL_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+export const WEEK_DAYS_CONFIG = [
+  { key: 'Mon', label: 'M', name: 'Monday' },
+  { key: 'Tue', label: 'T', name: 'Tuesday' },
+  { key: 'Wed', label: 'W', name: 'Wednesday' },
+  { key: 'Thu', label: 'T', name: 'Thursday' },
+  { key: 'Fri', label: 'F', name: 'Friday' },
+  { key: 'Sat', label: 'S', name: 'Saturday' },
+  { key: 'Sun', label: 'S', name: 'Sunday' },
+];
+
+export function normalizeHabitDays(days?: string[]): string[] {
+  if (!days || days.length === 0) return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  if (days.some(d => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].includes(d))) {
+    return days;
+  }
+  // Convert legacy ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+  const result: string[] = [];
+  if (days.includes('M')) result.push('Mon');
+  if (days.includes('W')) result.push('Wed');
+  if (days.includes('F')) result.push('Fri');
+  const tCount = days.filter(d => d === 'T').length;
+  if (tCount >= 2 || (tCount === 1 && days.length >= 5)) {
+    result.push('Tue', 'Thu');
+  } else if (tCount === 1) {
+    result.push('Tue');
+  }
+  const sCount = days.filter(d => d === 'S').length;
+  if (sCount >= 2 || (sCount === 1 && days.length === 7)) {
+    result.push('Sat', 'Sun');
+  } else if (sCount === 1) {
+    result.push('Sat');
+  }
+  return result.length > 0 ? result : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+}
 
 export const HabitModal: React.FC<HabitModalProps> = ({
   isOpen,
@@ -107,7 +140,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
   // Repeating Frequency states
   const [frequencyPreset, setFrequencyPreset] = useState<FrequencyPreset>('all');
   const [customSubMode, setCustomSubMode] = useState<CustomSubMode>('specific_days');
-  const [activeDays, setActiveDays] = useState<string[]>(['M', 'T', 'W', 'T', 'F', 'S', 'S']);
+  const [activeDays, setActiveDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
   const [intervalDays, setIntervalDays] = useState<number>(2);
   const [weeklyTargetDays, setWeeklyTargetDays] = useState<number>(3);
 
@@ -136,20 +169,20 @@ export const HabitModal: React.FC<HabitModalProps> = ({
         setFrequencyPreset('custom');
         setCustomSubMode('interval');
         setIntervalDays(habit.frequency_value || 2);
-        setActiveDays(['M', 'T', 'W', 'T', 'F', 'S', 'S']);
+        setActiveDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
       } else if (habit.frequency_type === 'weekly_target') {
         setFrequencyPreset('custom');
         setCustomSubMode('weekly_target');
         setWeeklyTargetDays(habit.frequency_value || 3);
-        setActiveDays(['M', 'T', 'W', 'T', 'F', 'S', 'S']);
+        setActiveDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
       } else {
-        const days = habit.active_days && habit.active_days.length > 0 ? habit.active_days : ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+        const days = normalizeHabitDays(habit.active_days);
         setActiveDays(days);
         if (days.length === 7) {
           setFrequencyPreset('all');
-        } else if (days.length === 5 && !days.includes('S')) {
+        } else if (days.length === 5 && !days.includes('Sat') && !days.includes('Sun')) {
           setFrequencyPreset('weekdays');
-        } else if (days.length === 2 && days.every(d => d === 'S')) {
+        } else if (days.length === 2 && days.includes('Sat') && days.includes('Sun')) {
           setFrequencyPreset('weekends');
         } else {
           setFrequencyPreset('custom');
@@ -169,7 +202,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
       setCustomSubMode('specific_days');
       setIntervalDays(2);
       setWeeklyTargetDays(3);
-      setActiveDays(['M', 'T', 'W', 'T', 'F', 'S', 'S']);
+      setActiveDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
     }
   }, [habit, isOpen]);
 
@@ -205,27 +238,26 @@ export const HabitModal: React.FC<HabitModalProps> = ({
   const handleSelectPreset = (preset: FrequencyPreset) => {
     setFrequencyPreset(preset);
     if (preset === 'all') {
-      setActiveDays(['M', 'T', 'W', 'T', 'F', 'S', 'S']);
+      setActiveDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
     } else if (preset === 'weekdays') {
-      setActiveDays(['M', 'T', 'W', 'T', 'F']);
+      setActiveDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
     } else if (preset === 'weekends') {
-      setActiveDays(['S', 'S']);
+      setActiveDays(['Sat', 'Sun']);
     } else if (preset === 'custom') {
       if (customSubMode === 'specific_days' && activeDays.length === 7) {
-        setActiveDays(['M', 'W', 'F']);
+        setActiveDays(['Mon', 'Wed', 'Fri']);
       }
     }
   };
 
-  const toggleDay = (index: number) => {
-    const dayTag = DAY_LABELS[index];
-    const isCurrentlyActive = activeDays.includes(dayTag);
+  const toggleDay = (dayKey: string) => {
+    const isCurrentlyActive = activeDays.includes(dayKey);
     let nextDays: string[];
     if (isCurrentlyActive) {
       if (activeDays.length <= 1) return; // keep at least 1 day
-      nextDays = activeDays.filter(d => d !== dayTag);
+      nextDays = activeDays.filter(d => d !== dayKey);
     } else {
-      nextDays = [...activeDays, dayTag];
+      nextDays = [...activeDays, dayKey];
     }
     setActiveDays(nextDays);
     setFrequencyPreset('custom');
@@ -236,11 +268,11 @@ export const HabitModal: React.FC<HabitModalProps> = ({
     setFrequencyPreset('custom');
     setCustomSubMode('specific_days');
     if (combo === 'mwf') {
-      setActiveDays(['M', 'W', 'F']);
+      setActiveDays(['Mon', 'Wed', 'Fri']);
     } else if (combo === 'tts') {
-      setActiveDays(['T', 'T', 'S']);
+      setActiveDays(['Tue', 'Thu', 'Sat']);
     } else if (combo === 'all') {
-      setActiveDays(['M', 'T', 'W', 'T', 'F', 'S', 'S']);
+      setActiveDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
     }
   };
 
@@ -259,13 +291,13 @@ export const HabitModal: React.FC<HabitModalProps> = ({
 
       if (frequencyPreset === 'all') {
         finalFrequencyType = 'days';
-        finalActiveDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+        finalActiveDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       } else if (frequencyPreset === 'weekdays') {
         finalFrequencyType = 'days';
-        finalActiveDays = ['M', 'T', 'W', 'T', 'F'];
+        finalActiveDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
       } else if (frequencyPreset === 'weekends') {
         finalFrequencyType = 'days';
-        finalActiveDays = ['S', 'S'];
+        finalActiveDays = ['Sat', 'Sun'];
       } else if (frequencyPreset === 'custom') {
         if (customSubMode === 'specific_days') {
           finalFrequencyType = 'days';
@@ -274,11 +306,11 @@ export const HabitModal: React.FC<HabitModalProps> = ({
         } else if (customSubMode === 'interval') {
           finalFrequencyType = 'interval';
           finalFrequencyValue = Math.max(2, intervalDays || 2);
-          finalActiveDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+          finalActiveDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         } else if (customSubMode === 'weekly_target') {
           finalFrequencyType = 'weekly_target';
           finalFrequencyValue = Math.min(7, Math.max(1, weeklyTargetDays || 3));
-          finalActiveDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+          finalActiveDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         }
       }
 
@@ -753,21 +785,21 @@ export const HabitModal: React.FC<HabitModalProps> = ({
                     </div>
 
                     <div className="grid grid-cols-7 gap-1.5">
-                      {DAY_LABELS.map((dayTag, idx) => {
-                        const isActive = activeDays.includes(dayTag);
+                      {WEEK_DAYS_CONFIG.map((dayItem) => {
+                        const isActive = activeDays.includes(dayItem.key);
                         return (
                           <button
-                            key={`${dayTag}-${idx}`}
+                            key={dayItem.key}
                             type="button"
-                            onClick={() => toggleDay(idx)}
-                            title={DAY_FULL_NAMES[idx]}
+                            onClick={() => toggleDay(dayItem.key)}
+                            title={dayItem.name}
                             className={`h-9 rounded-xl border text-xs font-mono font-bold flex flex-col items-center justify-center transition-all ${
                               isActive
                                 ? 'bg-luma-lime text-black border-luma-lime shadow-sm'
                                 : 'bg-[#1b1c1b] border-luma-card-border text-luma-text-dim hover:text-white'
                             }`}
                           >
-                            <span>{dayTag}</span>
+                            <span>{dayItem.label}</span>
                           </button>
                         );
                       })}
@@ -884,21 +916,21 @@ export const HabitModal: React.FC<HabitModalProps> = ({
             ) : (
               /* Non-custom preview pills */
               <div className="grid grid-cols-7 gap-1.5">
-                {DAY_LABELS.map((dayTag, idx) => {
-                  const isActive = activeDays.includes(dayTag);
+                {WEEK_DAYS_CONFIG.map((dayItem) => {
+                  const isActive = activeDays.includes(dayItem.key);
                   return (
                     <button
-                      key={`${dayTag}-${idx}`}
+                      key={dayItem.key}
                       type="button"
-                      onClick={() => toggleDay(idx)}
-                      title={`${DAY_FULL_NAMES[idx]} (Click to customize)`}
+                      onClick={() => toggleDay(dayItem.key)}
+                      title={`${dayItem.name} (Click to customize)`}
                       className={`h-9 rounded-xl border text-xs font-mono font-bold flex flex-col items-center justify-center transition-all ${
                         isActive
                           ? 'bg-luma-lime text-black border-luma-lime shadow-sm'
                           : 'bg-[#1b1c1b] border-luma-card-border text-luma-text-dim hover:text-white'
                       }`}
                     >
-                      <span>{dayTag}</span>
+                      <span>{dayItem.label}</span>
                     </button>
                   );
                 })}

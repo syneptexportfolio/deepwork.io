@@ -4,6 +4,24 @@ import { getTodayIST, pruneOrResetSchedule } from './schedule';
 
 export const weeklyGoalsRouter = new Hono<{ Bindings: Env }>();
 
+function formatGoalWithPacing(g: WeeklyGoal) {
+  const now = new Date();
+  const end = new Date(g.week_end).getTime();
+  const daysLeft = Math.max(1, Math.ceil((end - now.getTime()) / (1000 * 60 * 60 * 24)));
+  const remainingUnits = Math.max(0, g.target_units - g.completed_units);
+  const unitsPerDay = Number((remainingUnits / daysLeft).toFixed(1));
+  const progressPercent = Math.min(100, Math.round((g.completed_units / Math.max(g.target_units, 1)) * 100));
+
+  return {
+    ...g,
+    daysLeft,
+    remainingUnits,
+    unitsPerDay,
+    progressPercent,
+    isBehindPace: unitsPerDay > (g.target_units / 7) * 1.3
+  };
+}
+
 // GET /api/weekly-goals
 weeklyGoalsRouter.get('/', async (c) => {
   try {
@@ -11,24 +29,7 @@ weeklyGoalsRouter.get('/', async (c) => {
       'SELECT * FROM weekly_goals ORDER BY priority DESC, created_at ASC'
     ).all<WeeklyGoal>();
 
-    const now = new Date();
-    const goalsWithPacing = (results || []).map((g) => {
-      const end = new Date(g.week_end).getTime();
-      const daysLeft = Math.max(1, Math.ceil((end - now.getTime()) / (1000 * 60 * 60 * 24)));
-      const remainingUnits = Math.max(0, g.target_units - g.completed_units);
-      const unitsPerDay = Number((remainingUnits / daysLeft).toFixed(1));
-      const progressPercent = Math.min(100, Math.round((g.completed_units / Math.max(g.target_units, 1)) * 100));
-
-      return {
-        ...g,
-        daysLeft,
-        remainingUnits,
-        unitsPerDay,
-        progressPercent,
-        isBehindPace: unitsPerDay > (g.target_units / 7) * 1.3
-      };
-    });
-
+    const goalsWithPacing = (results || []).map(formatGoalWithPacing);
     return c.json({ success: true, weeklyGoals: goalsWithPacing });
   } catch (err: any) {
     return c.json({ success: false, error: err.message }, 500);
@@ -46,7 +47,7 @@ weeklyGoalsRouter.post('/', async (c) => {
     const target_units = body.target_units || 5;
     const completed_units = body.completed_units || 0;
     const unit_label = body.unit_label || 'topics';
-    const week_start = body.week_start || new Date().toISOString().split('T')[0];
+    const week_start = body.week_start || getTodayIST();
     const week_end = body.week_end || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
     const priority = body.priority || 'HIGH';
     const energy_level = body.energy_level || 'deep_focus';
@@ -59,7 +60,7 @@ weeklyGoalsRouter.post('/', async (c) => {
     ).bind(id, title, target_units, completed_units, unit_label, week_start, week_end, priority, energy_level, goal_id, category).run();
 
     const created = await c.env.DB.prepare('SELECT * FROM weekly_goals WHERE id = ?').bind(id).first<WeeklyGoal>();
-    return c.json({ success: true, weeklyGoal: created }, 201);
+    return c.json({ success: true, weeklyGoal: created ? formatGoalWithPacing(created) : null }, 201);
   } catch (err: any) {
     return c.json({ success: false, error: err.message }, 500);
   }
@@ -83,12 +84,57 @@ weeklyGoalsRouter.patch('/:id', async (c) => {
     const goal_id = body.goal_id !== undefined ? body.goal_id : current.goal_id;
     const category = body.category !== undefined ? body.category : (current.category || 'Project');
 
+    // Sync linked long-term goal if goal_id is linked and completed_units changed
+    const effectiveGoalId = goal_id !== undefined ? goal_id : current.goal_id;
+    if (effectiveGoalId && completed_units !== undefined && completed_units !== current.completed_units) {
+      try {
+        const targetGoalRaw = await c.env.DB.prepare('SELECT * FROM goals WHERE id = ?').bind(effectiveGoalId).first<any>();
+        if (targetGoalRaw) {
+          let syllabus = typeof targetGoalRaw.syllabus === 'string' ? JSON.parse(targetGoalRaw.syllabus) : targetGoalRaw.syllabus || [];
+          const diff = completed_units - current.completed_units;
+          
+          if (diff > 0) {
+            let newlyCovered = 0;
+            for (const topic of syllabus) {
+              if (!topic.covered && newlyCovered < diff) {
+                topic.covered = true;
+                topic.status = 'COVERED';
+                newlyCovered++;
+              }
+            }
+          } else if (diff < 0) {
+            let newlyUncovered = 0;
+            const toUncover = Math.abs(diff);
+            for (let i = syllabus.length - 1; i >= 0; i--) {
+              if (syllabus[i].covered && newlyUncovered < toUncover) {
+                syllabus[i].covered = false;
+                syllabus[i].status = 'NEXT UP';
+                newlyUncovered++;
+              }
+            }
+          }
+
+          const coveredCount = syllabus.filter((t: any) => t.covered).length;
+          const totalUnits = Math.max(targetGoalRaw.total_units || 0, syllabus.length, 1);
+          const newCoveredUnits = syllabus.length > 0
+            ? (syllabus.length === totalUnits ? coveredCount : Math.round((coveredCount / syllabus.length) * totalUnits))
+            : Math.max(0, Math.min(totalUnits, (targetGoalRaw.covered_units || 0) + diff));
+
+          await c.env.DB.prepare(
+            'UPDATE goals SET syllabus = ?, covered_units = ? WHERE id = ?'
+          ).bind(JSON.stringify(syllabus), newCoveredUnits, effectiveGoalId).run();
+        }
+      } catch (syncErr) {
+        console.error('Failed to sync linked long-term goal from weekly goal:', syncErr);
+      }
+    }
+
     await c.env.DB.prepare(
       `UPDATE weekly_goals SET title = ?, target_units = ?, completed_units = ?, unit_label = ?, priority = ?, energy_level = ?, goal_id = ?, category = ? WHERE id = ?`
     ).bind(title, target_units, completed_units, unit_label, priority, energy_level, goal_id, category, id).run();
 
     const updated = await c.env.DB.prepare('SELECT * FROM weekly_goals WHERE id = ?').bind(id).first<WeeklyGoal>();
-    return c.json({ success: true, weeklyGoal: updated });
+    return c.json({ success: true, weeklyGoal: updated ? formatGoalWithPacing(updated) : null });
   } catch (err: any) {
     return c.json({ success: false, error: err.message }, 500);
   }

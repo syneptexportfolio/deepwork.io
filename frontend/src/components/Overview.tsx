@@ -423,13 +423,13 @@ export const Overview: React.FC<OverviewProps> = ({
         {/* Mini 7-Day Bar Chart */}
         <div className="flex items-end gap-3.5 pt-2">
           {(stats?.weeklyPatternDays || [
-            { day: 'M', heightPercent: 45 },
-            { day: 'T', heightPercent: 70 },
-            { day: 'W', heightPercent: 35 },
-            { day: 'T', heightPercent: 85 },
-            { day: 'F', heightPercent: 60 },
-            { day: 'S', heightPercent: 95 },
-            { day: 'S', heightPercent: 75 },
+            { day: 'M', heightPercent: 0 },
+            { day: 'T', heightPercent: 0 },
+            { day: 'W', heightPercent: 0 },
+            { day: 'T', heightPercent: 0 },
+            { day: 'F', heightPercent: 0 },
+            { day: 'S', heightPercent: 0 },
+            { day: 'S', heightPercent: 0 },
           ]).map((bar, i) => (
             <div key={i} className="flex flex-col items-center gap-2">
               <div className="w-4 h-16 bg-[#212421] rounded-t-sm flex items-end overflow-hidden">
