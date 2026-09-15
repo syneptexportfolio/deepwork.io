@@ -172,6 +172,14 @@ scheduleRouter.post('/generate', async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
     const targetDate = body.date && body.date.trim() !== '' ? body.date.trim() : getTodayIST();
+    const today = getTodayIST();
+
+    if (targetDate < today) {
+      return c.json({
+        success: false,
+        error: 'Cannot generate or shape schedules for past dates.'
+      }, 400);
+    }
 
     // 1. Get answers from request body or last questionnaire response
     let answers: QuestionnaireAnswers = body.answers;

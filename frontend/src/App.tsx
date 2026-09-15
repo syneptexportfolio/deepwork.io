@@ -256,10 +256,14 @@ export const App: React.FC = () => {
   };
 
   const handleShapeMyDaySubmit = async (answers: QuestionnaireAnswers, targetDate?: string) => {
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    if (targetDate && targetDate < todayIST) {
+      alert('Past days cannot be shaped. Please choose today or an upcoming day.');
+      return;
+    }
     await api.submitQuestionnaire(answers);
     const res = await api.generateSchedule(answers, targetDate);
     if (res.schedule) {
-      const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
       if (!targetDate || targetDate === todayIST) {
         setSchedule(res.schedule);
       }
@@ -370,6 +374,10 @@ export const App: React.FC = () => {
           }
           onAdjustCapacity={() => setIsSettingsOpen(true)}
           onOpenShapeMyDay={(targetDate) => {
+            const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+            if (targetDate && targetDate < todayIST) {
+              return;
+            }
             setShapeTargetDate(targetDate);
             setIsShapeMyDayOpen(true);
           }}

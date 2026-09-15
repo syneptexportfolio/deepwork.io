@@ -153,6 +153,12 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const isPastTarget = useMemo(() => {
+    if (!targetDate) return false;
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    return targetDate < todayIST;
+  }, [targetDate]);
+
   // Section 1: Rhythm, Working Hours & Energy
   const [wakeTime, setWakeTime] = useState('07:30');
   const [sleepTime, setSleepTime] = useState('23:30');
@@ -362,6 +368,10 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPastTarget) {
+      setErrorMessage('Past days cannot be shaped. Please select today or an upcoming day.');
+      return;
+    }
     setErrorMessage(null);
     setLoading(true);
     try {
@@ -463,6 +473,12 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
         </div>
 
         {/* ERROR NOTIFICATION BANNER */}
+        {isPastTarget && (
+          <div className="mx-6 mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2 shrink-0">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="flex-1">This day has already passed. Past days are archived and cannot be shaped.</span>
+          </div>
+        )}
         {errorMessage && (
           <div className="mx-6 mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2 shrink-0">
             <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
@@ -1638,11 +1654,17 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
 
               <button
                 type="submit"
-                disabled={loading}
-                className="flex items-center justify-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-6 py-2.5 rounded-xl font-semibold text-xs shadow-lime-glow active:scale-[0.98] transition-all disabled:opacity-50"
+                disabled={loading || isPastTarget}
+                className="flex items-center justify-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-6 py-2.5 rounded-xl font-semibold text-xs shadow-lime-glow active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Sparkles className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>{loading ? 'Synthesizing Merged Rhythm...' : 'Generate Merged Timetable'}</span>
+                <span>
+                  {loading
+                    ? 'Synthesizing Merged Rhythm...'
+                    : isPastTarget
+                    ? 'Cannot Shape Past Dates'
+                    : 'Generate Merged Timetable'}
+                </span>
               </button>
             </div>
           </div>

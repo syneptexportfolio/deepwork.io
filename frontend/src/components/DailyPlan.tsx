@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CheckCircle2, Circle, Play, Sparkles, Calendar, Briefcase } from 'lucide-react';
+import { CheckCircle2, Circle, Play, Sparkles, Calendar, Briefcase, History } from 'lucide-react';
 import { api, Habit, ScheduleBlock, isTimeWithinBlock } from '../services/api';
 import { DailyAnchorsCard } from './DailyAnchorsCard';
 
@@ -172,6 +172,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
   const activeDaySchedule = scheduleMap[selectedDateStr] ?? (selectedDateStr === todayDateStr ? schedule : []);
 
   const isSelectedToday = selectedDateStr === todayDateStr;
+  const isPastDate = selectedDateStr < todayDateStr;
   const selectedDayItem = weekDays.find(w => w.dateStr === selectedDateStr) || weekDays.find(w => w.isToday) || weekDays[0];
   const selectedDayCode = selectedDayItem.day;
 
@@ -188,7 +189,11 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
     ? activeDaySchedule.find(s => s.status === 'pending' && s.type === 'deep_focus' && s.end_time >= currentHHMM)
     : null) || activeDaySchedule.find(s => s.status === 'pending' && s.type === 'deep_focus') || activeDaySchedule[0]) : null;
 
-  const sequenceTitle = isSelectedToday ? "Today's sequence" : `${fullDayNames[selectedDayCode]}'s sequence`;
+  const sequenceTitle = isSelectedToday
+    ? "Today's sequence"
+    : isPastDate
+    ? `${fullDayNames[selectedDayCode]}'s sequence (Archived)`
+    : `${fullDayNames[selectedDayCode]}'s sequence (Advance View)`;
 
   // Toggle schedule status handler
   const handleToggleBlock = (blockId: string) => {
@@ -225,7 +230,12 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
-          {onOpenShapeMyDay && (
+          {isPastDate ? (
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/[0.03] border border-white/10 text-luma-text-dim text-xs font-mono select-none">
+              <History className="w-3.5 h-3.5" />
+              <span>Past date • Archive</span>
+            </div>
+          ) : onOpenShapeMyDay ? (
             <button
               onClick={() => onOpenShapeMyDay(selectedDateStr)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-luma-lime hover:bg-luma-lime-hover text-black text-xs font-semibold shadow-lime-glow active:scale-95 transition-all"
@@ -233,7 +243,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
               <Sparkles className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>{isSelectedToday ? 'Shape my day' : `Shape ${selectedDayItem.day}`}</span>
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -286,8 +296,20 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                 </button>
               )}
               {activeDaySchedule.length > 0 ? (
-                <span className="text-xs font-mono tracking-wider uppercase text-luma-text-muted">
-                  {totalProtectedText}
+                isPastDate ? (
+                  <span className="text-[11px] font-mono tracking-wider uppercase text-luma-text-dim bg-white/5 px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1.5">
+                    <History className="w-3 h-3 text-white/40" />
+                    <span>ARCHIVE • {totalProtectedText}</span>
+                  </span>
+                ) : (
+                  <span className="text-xs font-mono tracking-wider uppercase text-luma-text-muted">
+                    {totalProtectedText}
+                  </span>
+                )
+              ) : isPastDate ? (
+                <span className="text-[11px] font-mono tracking-wider uppercase text-luma-text-dim bg-[#212421] px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1.5">
+                  <History className="w-3 h-3 text-white/30" />
+                  <span>PAST / UNSHAPED</span>
                 </span>
               ) : (
                 <span className="text-[11px] font-mono tracking-wider uppercase text-luma-text-dim bg-[#212421] px-2.5 py-1 rounded-full border border-white/5">
@@ -415,6 +437,18 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                 );
               })}
             </div>
+          ) : isPastDate ? (
+            <div className="p-8 text-center rounded-2xl border border-dashed border-white/10 bg-[#161716]/60 flex flex-col items-center justify-center my-2">
+              <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-luma-text-dim mb-3">
+                <History className="w-6 h-6 stroke-[1.5] text-luma-text-dim" />
+              </div>
+              <p className="text-sm font-medium text-white mb-1">
+                No schedule recorded for {fullDayNames[selectedDayCode]}
+              </p>
+              <p className="text-xs text-luma-text-muted max-w-sm">
+                {fullDayNames[selectedDayCode]} ({selectedDayItem.date} {selectedDayItem.fullDate.toLocaleDateString('en-US', { month: 'short' })}) has already passed without a recorded timetable. Past days are archived and cannot be shaped.
+              </p>
+            </div>
           ) : (
             <div className="p-8 text-center rounded-2xl border border-dashed border-white/10 bg-[#161716]/60 flex flex-col items-center justify-center my-2">
               <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-luma-text-dim mb-3">
@@ -434,7 +468,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                   className="flex items-center gap-2 px-4 py-2 rounded-xl bg-luma-lime text-black font-semibold text-xs shadow-lime-glow hover:bg-luma-lime-hover transition-all active:scale-95"
                 >
                   <Sparkles className="w-3.5 h-3.5 stroke-[2]" />
-                  <span>Shape {isSelectedToday ? 'my day' : fullDayNames[selectedDayCode]} with AI</span>
+                  <span>Shape {isSelectedToday ? 'my day' : `${fullDayNames[selectedDayCode]} with AI`}</span>
                 </button>
               )}
             </div>
