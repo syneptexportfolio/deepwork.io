@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Plus, Flame, Sun, Waves, Moon, CheckCircle2, ArrowRight, Trash2, Pencil, RotateCcw, Target, Clock, Sparkles } from 'lucide-react';
 import { Habit, Task, WeeklyGoal } from '../services/api';
+import { DailyTaskVisualizer } from './visualizers/DailyTaskVisualizer';
+import { WeeklyGoalVisualizer } from './visualizers/WeeklyGoalVisualizer';
+import { MonthlyHabitVisualizer } from './visualizers/MonthlyHabitVisualizer';
 
 interface TasksProps {
   tasks: Task[];
@@ -46,10 +49,27 @@ export const Tasks: React.FC<TasksProps> = ({
   const [isAdding, setIsAdding] = useState(false);
   const [confirmingHabitId, setConfirmingHabitId] = useState<string | null>(null);
   const [confirmingWeeklyGoalId, setConfirmingWeeklyGoalId] = useState<string | null>(null);
+  const [taskFilter, setTaskFilter] = useState<string>('all');
+  const [weeklyCategoryFilter, setWeeklyCategoryFilter] = useState<string>('all');
 
-  const morningTasks = tasks.filter(t => t.column_bucket === 'now' || (t as any).column_bucket === 'morning');
-  const afternoonTasks = tasks.filter(t => t.column_bucket === 'up_next' || (t as any).column_bucket === 'afternoon');
-  const eveningTasks = tasks.filter(t => t.column_bucket === 'later' || (t as any).column_bucket === 'evening');
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      if (taskFilter === 'deep_focus') return t.energy_level === 'deep_focus';
+      if (taskFilter === 'light') return t.energy_level === 'light';
+      if (taskFilter === 'pending') return t.status === 'pending';
+      if (taskFilter === 'done') return t.status === 'done';
+      return true;
+    });
+  }, [tasks, taskFilter]);
+
+  const filteredWeeklyGoals = useMemo(() => {
+    if (weeklyCategoryFilter === 'all') return weeklyGoals;
+    return weeklyGoals.filter((wg) => (wg.category || 'Project').toLowerCase() === weeklyCategoryFilter.toLowerCase());
+  }, [weeklyGoals, weeklyCategoryFilter]);
+
+  const morningTasks = filteredTasks.filter(t => t.column_bucket === 'now' || (t as any).column_bucket === 'morning');
+  const afternoonTasks = filteredTasks.filter(t => t.column_bucket === 'up_next' || (t as any).column_bucket === 'afternoon');
+  const eveningTasks = filteredTasks.filter(t => t.column_bucket === 'later' || (t as any).column_bucket === 'evening');
 
   const handleQuickSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,6 +250,13 @@ export const Tasks: React.FC<TasksProps> = ({
       {/* SECTION 1: DAILY TO-DOS */}
       {activeSection === 'todos' && (
         <div className="space-y-6">
+          {/* Graphical Visualization: Daily Completion Ring & Daylight Velocity */}
+          <DailyTaskVisualizer
+            tasks={tasks}
+            activeFilter={taskFilter}
+            onSelectFilter={setTaskFilter}
+          />
+
           {/* Rapid Morning Brain Dump Input Bar */}
           <form onSubmit={handleQuickSubmit} className="flex items-center gap-3">
             <input
@@ -298,9 +325,11 @@ export const Tasks: React.FC<TasksProps> = ({
         </div>
       )}
 
-      {/* SECTION 2: MONTHLY HABITS */}
+      {/* SECTION 2: DAILY HABITS */}
       {activeSection === 'habits' && (
         <div className="space-y-6">
+          {/* Graphical Visualization: Monthly Habit Consistency & 30-Day Heatmap */}
+          <MonthlyHabitVisualizer habits={habits} />
           <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 flex items-center justify-between">
             <div>
               <h3 className="text-base font-semibold text-white mb-1">Monthly Habit Routines</h3>
@@ -513,6 +542,12 @@ export const Tasks: React.FC<TasksProps> = ({
       {/* SECTION 3: WEEKLY GOALS */}
       {activeSection === 'weekly' && (
         <div className="space-y-6">
+          {/* Graphical Visualization: Weekly Velocity & Pacing Trajectory */}
+          <WeeklyGoalVisualizer
+            weeklyGoals={weeklyGoals}
+            activeCategoryFilter={weeklyCategoryFilter}
+            onSelectCategoryFilter={setWeeklyCategoryFilter}
+          />
           <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 flex items-center justify-between">
             <div>
               <h3 className="text-base font-semibold text-white mb-1">Weekly Target Goals</h3>
@@ -535,12 +570,14 @@ export const Tasks: React.FC<TasksProps> = ({
             </div>
           </div>
 
-          {weeklyGoals.length === 0 ? (
+          {filteredWeeklyGoals.length === 0 ? (
             <div className="p-12 text-center rounded-3xl border border-dashed border-white/10 bg-[#161716]/60 flex flex-col items-center justify-center my-2">
               <div className="w-12 h-12 rounded-2xl bg-luma-lime/10 border border-luma-lime/20 flex items-center justify-center text-luma-lime mb-3">
                 <Target className="w-6 h-6 stroke-[1.5]" />
               </div>
-              <h4 className="text-base font-semibold text-white mb-1">No weekly target goals set</h4>
+              <h4 className="text-base font-semibold text-white mb-1">
+                {weeklyCategoryFilter !== 'all' ? `No ${weeklyCategoryFilter} weekly goals` : 'No weekly target goals set'}
+              </h4>
               <p className="text-xs text-luma-text-muted max-w-sm mb-5 leading-relaxed">
                 Set high-leverage weekly targets for your projects, exams, or craft. The timetable scheduler will automatically protect focus blocks to keep you on pace.
               </p>
@@ -555,7 +592,7 @@ export const Tasks: React.FC<TasksProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {weeklyGoals.map((wg) => {
+              {filteredWeeklyGoals.map((wg) => {
               const progress = wg.progressPercent || Math.round((wg.completed_units / Math.max(wg.target_units, 1)) * 100);
               const cat = (wg.category || 'Project').toLowerCase();
               let badgeStyle = { label: 'PROJECT', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' };
