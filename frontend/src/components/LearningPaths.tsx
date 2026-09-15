@@ -105,7 +105,16 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
     );
   }
 
-  const progressPercent = Math.min(100, Math.round((activeGoal.covered_units / Math.max(activeGoal.total_units, 1)) * 100));
+  const coveredTopicsCount = activeGoal.syllabus?.filter((t) => t.covered || t.status === 'COVERED').length ?? 0;
+  const totalTopicsCount = activeGoal.syllabus?.length ?? 0;
+  const effectiveTotalUnits = Math.max(activeGoal.total_units || 0, totalTopicsCount, 1);
+  const effectiveCoveredUnits = totalTopicsCount > 0
+    ? (totalTopicsCount === effectiveTotalUnits
+        ? coveredTopicsCount
+        : Math.round((coveredTopicsCount / totalTopicsCount) * effectiveTotalUnits))
+    : (activeGoal.covered_units || 0);
+
+  const progressPercent = Math.min(100, Math.max(0, Math.round((effectiveCoveredUnits / effectiveTotalUnits) * 100)));
 
   const targetDate = new Date(activeGoal.target_date).getTime();
   const now = new Date().getTime();
@@ -263,7 +272,7 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
                 </span>
               </div>
               <p className="text-xs text-luma-text-muted font-mono">
-                {daysRemaining} days remaining · {activeGoal.covered_units} of {activeGoal.total_units} {activeGoal.unit_label} complete
+                {daysRemaining} days remaining · {effectiveCoveredUnits} of {effectiveTotalUnits} {activeGoal.unit_label} complete
               </p>
             </div>
           </div>
@@ -274,7 +283,7 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
               {checklistTitle}
             </span>
             <span className="text-xs font-mono text-luma-text-muted">
-              {activeGoal.syllabus.filter((t) => t.covered).length} / {activeGoal.syllabus.length} DONE
+              {coveredTopicsCount} / {totalTopicsCount} DONE
             </span>
           </div>
 

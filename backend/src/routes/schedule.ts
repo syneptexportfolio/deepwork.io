@@ -399,9 +399,13 @@ scheduleRouter.patch('/block/:blockId', async (c) => {
           }
 
           const coveredCount = syllabus.filter((t: any) => t.covered).length;
+          const totalUnits = Math.max(goalRow.total_units || 0, syllabus.length, 1);
+          const coveredUnits = syllabus.length > 0
+            ? (syllabus.length === totalUnits ? coveredCount : Math.round((coveredCount / syllabus.length) * totalUnits))
+            : 0;
           await c.env.DB.prepare(
-            'UPDATE goals SET syllabus = ?, covered_units = ? WHERE id = ?'
-          ).bind(JSON.stringify(syllabus), coveredCount, goalRow.id).run();
+            'UPDATE goals SET syllabus = ?, covered_units = ?, total_units = ? WHERE id = ?'
+          ).bind(JSON.stringify(syllabus), coveredUnits, totalUnits, goalRow.id).run();
         }
       }
     }

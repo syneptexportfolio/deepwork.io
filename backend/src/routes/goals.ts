@@ -36,11 +36,12 @@ goalsRouter.post('/', async (c) => {
 
     const target_date = body.target_date || new Date(Date.now() + 86 * 86400000).toISOString().split('T')[0];
     const category = body.category || 'Exam Preparation';
-    const syllabus = JSON.stringify(body.syllabus || []);
+    const syllabusArray = body.syllabus || [];
+    const syllabus = JSON.stringify(syllabusArray);
     const milestones = JSON.stringify(body.milestones || []);
     const recommendation = body.recommendation || 'Stay consistent with daily focused sessions.';
     const unit_label = body.unit_label || 'topics';
-    const total_units = body.total_units || 100;
+    const total_units = Math.max(body.total_units || 0, syllabusArray.length, 1);
     const covered_units = body.covered_units || 0;
 
     await c.env.DB.prepare(
@@ -115,12 +116,16 @@ goalsRouter.post('/:id/toggle-topic', async (c) => {
     topic.status = topic.covered ? 'COVERED' : 'NEXT UP';
 
     const coveredCount = goal.syllabus.filter((t: SyllabusTopic) => t.covered).length;
-    // calculate scaled covered_units
-    const coveredUnits = Math.max(goal.covered_units, Math.round((coveredCount / Math.max(goal.syllabus.length, 1)) * goal.total_units));
+    const totalUnits = Math.max(goal.total_units || 0, goal.syllabus.length, 1);
+    const coveredUnits = goal.syllabus.length > 0
+      ? (goal.syllabus.length === totalUnits
+          ? coveredCount
+          : Math.round((coveredCount / goal.syllabus.length) * totalUnits))
+      : 0;
 
     await c.env.DB.prepare(
-      'UPDATE goals SET syllabus = ?, covered_units = ? WHERE id = ?'
-    ).bind(JSON.stringify(goal.syllabus), coveredUnits, id).run();
+      'UPDATE goals SET syllabus = ?, covered_units = ?, total_units = ? WHERE id = ?'
+    ).bind(JSON.stringify(goal.syllabus), coveredUnits, totalUnits, id).run();
 
     const updatedRaw = await c.env.DB.prepare('SELECT * FROM goals WHERE id = ?').bind(id).first();
     return c.json({ success: true, goal: parseGoalRow(updatedRaw) });

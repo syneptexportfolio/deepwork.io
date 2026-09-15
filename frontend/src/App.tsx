@@ -245,6 +245,33 @@ export const App: React.FC = () => {
   };
 
   const handleToggleGoalTopic = async (goalId: string, topicId: string) => {
+    // Optimistic local state update
+    setGoals(prev => prev.map(g => {
+      if (g.id !== goalId) return g;
+      const updatedSyllabus = (g.syllabus || []).map(t => {
+        if (t.id === topicId) {
+          const nextCovered = !(t.covered || t.status === 'COVERED');
+          return {
+            ...t,
+            covered: nextCovered,
+            status: (nextCovered ? 'COVERED' : 'NEXT UP') as any
+          };
+        }
+        return t;
+      });
+      const coveredCount = updatedSyllabus.filter(t => t.covered || t.status === 'COVERED').length;
+      const totalUnits = Math.max(g.total_units || 0, updatedSyllabus.length, 1);
+      const coveredUnits = updatedSyllabus.length > 0
+        ? (updatedSyllabus.length === totalUnits ? coveredCount : Math.round((coveredCount / updatedSyllabus.length) * totalUnits))
+        : 0;
+      return {
+        ...g,
+        syllabus: updatedSyllabus,
+        total_units: totalUnits,
+        covered_units: coveredUnits,
+      };
+    }));
+
     try {
       const res = await api.toggleGoalTopic(goalId, topicId);
       if (res.goal) {
@@ -252,6 +279,7 @@ export const App: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to toggle topic:', err);
+      loadData();
     }
   };
 
