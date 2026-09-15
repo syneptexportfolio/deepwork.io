@@ -84,6 +84,23 @@ export async function pruneOrResetSchedule(db: any, date: string): Promise<Sched
   }
 }
 
+// GET /api/schedule?date=YYYY-MM-DD
+scheduleRouter.get('/', async (c) => {
+  try {
+    const queryDate = c.req.query('date');
+    const targetDate = queryDate && queryDate.trim() !== '' ? queryDate.trim() : getTodayIST();
+    const blocks = await pruneOrResetSchedule(c.env.DB, targetDate);
+    return c.json({
+      success: true,
+      date: targetDate,
+      cached: blocks.length > 0,
+      schedule: blocks
+    });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
+
 // GET /api/schedule/today
 scheduleRouter.get('/today', async (c) => {
   try {
@@ -95,6 +112,27 @@ scheduleRouter.get('/today', async (c) => {
       cached: blocks.length > 0,
       schedule: blocks
     });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
+
+// GET /api/schedule/active-dates
+scheduleRouter.get('/active-dates', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(
+      'SELECT date, generated_plan FROM schedules ORDER BY date ASC'
+    ).all<any>();
+    const activeDates: string[] = [];
+    for (const r of (results || [])) {
+      try {
+        const blocks = JSON.parse(r.generated_plan || '[]');
+        if (Array.isArray(blocks) && blocks.filter((b: any) => b.type !== 'break').length > 0) {
+          activeDates.push(r.date);
+        }
+      } catch {}
+    }
+    return c.json({ success: true, dates: activeDates });
   } catch (err: any) {
     return c.json({ success: false, error: err.message }, 500);
   }
@@ -132,8 +170,8 @@ scheduleRouter.post('/questionnaire', async (c) => {
 // POST /api/schedule/generate
 scheduleRouter.post('/generate', async (c) => {
   try {
-    const today = getTodayIST();
     const body = await c.req.json().catch(() => ({}));
+    const targetDate = body.date && body.date.trim() !== '' ? body.date.trim() : getTodayIST();
 
     // 1. Get answers from request body or last questionnaire response
     let answers: QuestionnaireAnswers = body.answers;
@@ -227,11 +265,10 @@ scheduleRouter.post('/generate', async (c) => {
     const model = c.env.GEMINI_MODEL || 'gemini-1.5-flash';
     const { blocks } = await generateScheduleWithGemini(tasks, goals, answers, habits, weeklyGoals, apiKey, model);
 
-    // 5. Cache/persist schedule in D1
-    const scheduleId = `sched-${today}`;
+    // 5. Save generated schedule strictly under targetDate
+    const scheduleId = `sched-${targetDate}`;
     const planJson = JSON.stringify(blocks);
 
-    // Upsert into schedules
     await c.env.DB.prepare(`
       INSERT INTO schedules (id, date, generated_plan, source_questionnaire_id)
       VALUES (?, ?, ?, ?)
@@ -239,12 +276,11 @@ scheduleRouter.post('/generate', async (c) => {
         generated_plan = excluded.generated_plan,
         source_questionnaire_id = excluded.source_questionnaire_id,
         created_at = datetime('now')
-    `).bind(scheduleId, today, planJson, questionnaireId).run();
-
+    `).bind(scheduleId, targetDate, planJson, questionnaireId).run();
 
     return c.json({
       success: true,
-      date: today,
+      date: targetDate,
       cached: false,
       schedule: blocks,
       modelUsed: apiKey ? model : 'smart-local-rhythm-engine'
@@ -260,15 +296,26 @@ scheduleRouter.patch('/block/:blockId', async (c) => {
     const blockId = c.req.param('blockId');
     const body = await c.req.json().catch(() => ({}));
     const status = body.status || 'done';
-    const today = getTodayIST();
+    const targetDate = body.date && body.date.trim() !== '' ? body.date.trim() : getTodayIST();
 
-    // Check today's schedule row strictly
-    const row = await c.env.DB.prepare(
+    // Look for targetDate schedule first
+    let row = await c.env.DB.prepare(
       'SELECT * FROM schedules WHERE date = ?'
-    ).bind(today).first<any>();
+    ).bind(targetDate).first<any>();
+
+    // Fallback: look for any schedule containing this blockId
+    if (!row || !row.generated_plan || !row.generated_plan.includes(blockId)) {
+      const allRows = await c.env.DB.prepare('SELECT * FROM schedules').all<any>();
+      for (const r of (allRows.results || [])) {
+        if (r.generated_plan && r.generated_plan.includes(blockId)) {
+          row = r;
+          break;
+        }
+      }
+    }
 
     if (!row || !row.generated_plan) {
-      return c.json({ success: false, error: 'No schedule found for today' }, 404);
+      return c.json({ success: false, error: 'No schedule found containing this block' }, 404);
     }
 
     const blocks: ScheduleBlock[] = JSON.parse(row.generated_plan);

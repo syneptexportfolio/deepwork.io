@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { SlidersHorizontal, CheckCircle2, Circle, Play, Sparkles, Calendar, Briefcase } from 'lucide-react';
-import { Habit, ScheduleBlock, isTimeWithinBlock } from '../services/api';
+import { CheckCircle2, Circle, Play, Sparkles, Calendar, Briefcase } from 'lucide-react';
+import { api, Habit, ScheduleBlock, isTimeWithinBlock } from '../services/api';
 import { DailyAnchorsCard } from './DailyAnchorsCard';
 
 type DayCode = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
@@ -16,8 +16,17 @@ const fullDayNames: Record<DayCode, string> = {
   SUN: 'Sunday',
 };
 
+export interface WeekDayItem {
+  day: DayCode;
+  date: string;
+  dateStr: string; // YYYY-MM-DD
+  isToday: boolean;
+  hasDot: boolean;
+  fullDate: Date;
+}
+
 // Compute dynamic current week starting from Monday
-const computeCurrentWeekDays = () => {
+export const computeCurrentWeekDays = (activeDates: string[] = []): WeekDayItem[] => {
   const now = new Date();
   const dayIdx = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
   const distToMonday = dayIdx === 0 ? -6 : 1 - dayIdx;
@@ -28,12 +37,22 @@ const computeCurrentWeekDays = () => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + idx);
     const dateNum = String(d.getDate()).padStart(2, '0');
+
+    // Format local YYYY-MM-DD
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
     const isToday = d.toDateString() === now.toDateString();
+    const hasDot = activeDates.includes(dateStr);
+
     return {
       day: code,
       date: dateNum,
+      dateStr,
       isToday,
-      hasDot: isToday,
+      hasDot,
       fullDate: d,
     };
   });
@@ -42,11 +61,11 @@ const computeCurrentWeekDays = () => {
 interface DailyPlanProps {
   schedule: ScheduleBlock[];
   habits?: Habit[];
-  onToggleStatus: (id: string) => void;
+  onToggleStatus: (id: string, dateStr?: string) => void;
   onToggleHabit?: (habitId: string) => void | Promise<void>;
   onStartFocus: (taskTitle: string, durationMinutes: number, blockId?: string) => void;
   onAdjustCapacity: () => void;
-  onOpenShapeMyDay?: () => void;
+  onOpenShapeMyDay?: (targetDate?: string) => void;
 }
 
 export const DailyPlan: React.FC<DailyPlanProps> = ({
@@ -66,20 +85,70 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
       return null;
     }
   }, []);
-  const now = new Date();
-  const todayDayMap: Record<number, DayCode> = {
-    0: 'SUN',
-    1: 'MON',
-    2: 'TUE',
-    3: 'WED',
-    4: 'THU',
-    5: 'FRI',
-    6: 'SAT',
-  };
-  const todayCode = todayDayMap[now.getDay()];
 
-  const [selectedDay, setSelectedDay] = useState<DayCode>(todayCode);
-  const weekDays = computeCurrentWeekDays();
+  // Today in IST
+  const todayDateStr = useMemo(() => {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  }, []);
+
+  // Date selection state
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(todayDateStr);
+  const [scheduleMap, setScheduleMap] = useState<Record<string, ScheduleBlock[]>>({});
+  const [activeDates, setActiveDates] = useState<string[]>([]);
+  const [loadingDay, setLoadingDay] = useState(false);
+
+  // Sync today's schedule from prop into scheduleMap
+  useEffect(() => {
+    if (schedule && schedule.length > 0) {
+      setScheduleMap(prev => ({ ...prev, [todayDateStr]: schedule }));
+    }
+  }, [schedule, todayDateStr]);
+
+  // Load active dates from backend
+  const loadActiveDates = async () => {
+    try {
+      const res = await api.getActiveScheduleDates();
+      if (res.dates) {
+        setActiveDates(res.dates);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadActiveDates();
+  }, [schedule]);
+
+  // Fetch schedule whenever selectedDateStr changes
+  useEffect(() => {
+    const fetchDaySchedule = async () => {
+      // If we already have a cached schedule for this date, use it
+      if (scheduleMap[selectedDateStr] !== undefined) {
+        return;
+      }
+
+      // If viewing today and today's schedule is provided via props
+      if (selectedDateStr === todayDateStr && schedule && schedule.length > 0) {
+        setScheduleMap(prev => ({ ...prev, [todayDateStr]: schedule }));
+        return;
+      }
+
+      setLoadingDay(true);
+      try {
+        const res = await api.getScheduleByDate(selectedDateStr);
+        const dayBlocks = res.schedule || [];
+        setScheduleMap(prev => ({ ...prev, [selectedDateStr]: dayBlocks }));
+        if (dayBlocks.length > 0 && !activeDates.includes(selectedDateStr)) {
+          setActiveDates(prev => [...prev, selectedDateStr]);
+        }
+      } catch {
+        setScheduleMap(prev => ({ ...prev, [selectedDateStr]: [] }));
+      } finally {
+        setLoadingDay(false);
+      }
+    };
+
+    fetchDaySchedule();
+  }, [selectedDateStr, todayDateStr, schedule]);
 
   // Track live current time (HH:MM) to highlight active block in real-time
   const [currentHHMM, setCurrentHHMM] = useState(() => {
@@ -97,21 +166,46 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // Dynamic protected focus calculation
-  const focusMinutes = schedule
+  const weekDays = useMemo(() => computeCurrentWeekDays(activeDates), [activeDates]);
+
+  // Active day schedule
+  const activeDaySchedule = scheduleMap[selectedDateStr] ?? (selectedDateStr === todayDateStr ? schedule : []);
+
+  const isSelectedToday = selectedDateStr === todayDateStr;
+  const selectedDayItem = weekDays.find(w => w.dateStr === selectedDateStr) || weekDays.find(w => w.isToday) || weekDays[0];
+  const selectedDayCode = selectedDayItem.day;
+
+  // Dynamic protected focus calculation for the active day
+  const focusMinutes = activeDaySchedule
     .filter(s => s.type === 'deep_focus')
     .reduce((sum, s) => sum + s.duration, 0);
   const focusHrs = Math.floor(focusMinutes / 60);
   const focusMins = focusMinutes % 60;
   const totalProtectedText = focusMinutes > 0 ? `${focusHrs}H ${focusMins}M PROTECTED` : '0H 0M PROTECTED';
 
-  // Find next pending protected block based on real time
-  const isSelectedToday = selectedDay === todayCode;
-  const nextBlock = schedule.length > 0 ? ((isSelectedToday
-    ? schedule.find(s => s.status === 'pending' && s.type === 'deep_focus' && s.end_time >= currentHHMM)
-    : null) || schedule.find(s => s.status === 'pending' && s.type === 'deep_focus') || schedule[0]) : null;
+  // Next pending block based on real time
+  const nextBlock = activeDaySchedule.length > 0 ? ((isSelectedToday
+    ? activeDaySchedule.find(s => s.status === 'pending' && s.type === 'deep_focus' && s.end_time >= currentHHMM)
+    : null) || activeDaySchedule.find(s => s.status === 'pending' && s.type === 'deep_focus') || activeDaySchedule[0]) : null;
 
-  const sequenceTitle = isSelectedToday ? "Today's sequence" : `${fullDayNames[selectedDay]}'s sequence`;
+  const sequenceTitle = isSelectedToday ? "Today's sequence" : `${fullDayNames[selectedDayCode]}'s sequence`;
+
+  // Toggle schedule status handler
+  const handleToggleBlock = (blockId: string) => {
+    // Optimistic update
+    setScheduleMap(prev => {
+      const list = prev[selectedDateStr] || activeDaySchedule;
+      const updated = list.map(b => {
+        if (b.id === blockId) {
+          const nextStatus: 'pending' | 'done' = b.status === 'done' ? 'pending' : 'done';
+          return { ...b, status: nextStatus };
+        }
+        return b;
+      });
+      return { ...prev, [selectedDateStr]: updated };
+    });
+    onToggleStatus(blockId, selectedDateStr);
+  };
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -133,31 +227,24 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
         <div className="flex items-center gap-3">
           {onOpenShapeMyDay && (
             <button
-              onClick={onOpenShapeMyDay}
+              onClick={() => onOpenShapeMyDay(selectedDateStr)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-luma-lime hover:bg-luma-lime-hover text-black text-xs font-semibold shadow-lime-glow active:scale-95 transition-all"
             >
               <Sparkles className="w-3.5 h-3.5 stroke-[2.2]" />
-              <span>Shape my day</span>
+              <span>{isSelectedToday ? 'Shape my day' : `Shape ${selectedDayItem.day}`}</span>
             </button>
           )}
-          <button
-            onClick={onAdjustCapacity}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-luma-card border border-luma-card-border hover:bg-white/[0.04] text-xs font-medium text-white transition-all"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-luma-text-muted" />
-            <span>Adjust capacity</span>
-          </button>
         </div>
       </div>
 
       {/* Weekday Selector Bar */}
       <div className="bg-luma-card border border-luma-card-border rounded-3xl p-3 flex items-center justify-between">
         {weekDays.map((item) => {
-          const isSelected = selectedDay === item.day;
+          const isSelected = selectedDateStr === item.dateStr;
           return (
             <button
               key={item.day}
-              onClick={() => setSelectedDay(item.day)}
+              onClick={() => setSelectedDateStr(item.dateStr)}
               className={`flex-1 flex flex-col items-center py-3.5 px-2 rounded-2xl transition-all ${
                 isSelected
                   ? 'bg-luma-cream text-luma-cream-text shadow-sm'
@@ -188,12 +275,17 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
             </h2>
             <div className="flex items-center gap-2">
               {savedWorkHours?.workStartTime && savedWorkHours?.workEndTime && (
-                <span className="text-[11px] font-mono text-luma-lime bg-[#252824] px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={onAdjustCapacity}
+                  title="Adjust working hours in Settings"
+                  className="text-[11px] font-mono text-luma-lime bg-[#252824] hover:bg-[#2e332d] px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
                   <Briefcase className="w-3 h-3 text-luma-lime" />
                   <span>{savedWorkHours.workStartTime} – {savedWorkHours.workEndTime}</span>
-                </span>
+                </button>
               )}
-              {schedule.length > 0 ? (
+              {activeDaySchedule.length > 0 ? (
                 <span className="text-xs font-mono tracking-wider uppercase text-luma-text-muted">
                   {totalProtectedText}
                 </span>
@@ -206,9 +298,14 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
           </div>
 
           {/* Sequence List with Timeline Spine */}
-          {schedule.length > 0 ? (
+          {loadingDay ? (
+            <div className="py-20 text-center space-y-2">
+              <div className="w-8 h-8 rounded-full border-2 border-luma-lime border-t-transparent animate-spin mx-auto" />
+              <p className="text-xs font-mono text-luma-text-muted">Loading schedule...</p>
+            </div>
+          ) : activeDaySchedule.length > 0 ? (
             <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-3 before:bottom-3 before:w-[2px] before:bg-[#252825]">
-              {schedule.map((item) => {
+              {activeDaySchedule.map((item) => {
                 const isDone = item.status === 'done';
                 const isBreak = item.type === 'break';
                 const isCurrentlyActive = isSelectedToday && isTimeWithinBlock(currentHHMM, item.start_time, item.end_time);
@@ -253,66 +350,66 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
 
                     {/* Task Card */}
                     <div
-                      onClick={() => onToggleStatus(item.id)}
+                      onClick={() => handleToggleBlock(item.id)}
                       className={`flex-1 flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer hover:brightness-110 ${cardBg}`}
                     >
-                      <div className="flex items-center gap-3.5">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {isDone ? (
-                          <CheckCircle2 className="w-5 h-5 text-luma-lime shrink-0" />
+                          <CheckCircle2 className="w-4 h-4 text-luma-lime shrink-0" />
                         ) : (
-                          <Circle className="w-5 h-5 text-luma-text-dim hover:text-white shrink-0" />
+                          <Circle className="w-4 h-4 text-luma-text-dim group-hover:text-white shrink-0" />
                         )}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-sm font-medium ${isDone ? 'line-through opacity-60' : ''}`}>
-                            {item.title}
+                        <span
+                          className={`text-sm font-medium ${
+                            isDone ? 'line-through text-white/60' : ''
+                          }`}
+                        >
+                          {item.title}
+                        </span>
+                        {isCurrentlyActive && (
+                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-luma-lime text-black font-bold tracking-wider flex items-center gap-1 shadow-sm animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-black"></span>
+                            ACTIVE NOW
                           </span>
-                          {isCurrentlyActive && (
-                            <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-luma-lime text-black font-bold tracking-wider flex items-center gap-1 shadow-sm animate-pulse">
-                              <span className="w-1.5 h-1.5 rounded-full bg-black"></span>
-                              ACTIVE NOW
-                            </span>
-                          )}
-                          {item.block_source === 'habit' && (
-                            <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-luma-purple-dim text-luma-purple border border-luma-purple/30">
-                              HABIT
-                            </span>
-                          )}
-                          {item.block_source === 'weekly_goal' && (
-                            <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#242b10] text-luma-lime border border-luma-lime/30">
-                              WEEKLY GOAL
-                            </span>
-                          )}
-                          {item.block_source === 'long_term_goal' && (
-                            <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#1b2535] text-[#60a5fa] border border-[#60a5fa]/30">
-                              LONG-TERM GOAL
-                            </span>
-                          )}
-                          {item.block_source === 'daily_todo' && (
-                            <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-luma-text-muted border border-white/10">
-                              TO-DO
-                            </span>
-                          )}
-                        </div>
+                        )}
+                        {item.block_source === 'habit' && (
+                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-luma-purple-dim text-luma-purple border border-luma-purple/30">
+                            HABIT
+                          </span>
+                        )}
+                        {item.block_source === 'weekly_goal' && (
+                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#242b10] text-luma-lime border border-luma-lime/30">
+                            WEEKLY GOAL
+                          </span>
+                        )}
+                        {item.block_source === 'long_term_goal' && (
+                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#1b2535] text-[#60a5fa] border border-[#60a5fa]/30">
+                            LONG-TERM GOAL
+                          </span>
+                        )}
+                        {item.block_source === 'daily_todo' && (
+                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-luma-text-muted border border-white/10">
+                            TO-DO
+                          </span>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-3 shrink-0">
-                        {item.target_label ? (
-                          <span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 ${isCurrentlyActive ? 'text-luma-lime border-luma-lime/40' : 'text-luma-lime'}`}>
-                            {item.target_label}
-                          </span>
-                        ) : item.is_untimed || item.duration === 0 ? (
-                          <span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 flex items-center gap-1 ${isCurrentlyActive ? 'text-luma-lime border-luma-lime/40' : 'text-luma-text-dim'}`}>
-                            <span className={isCurrentlyActive ? 'text-luma-lime' : ''}>⚡</span>
-                            <span className={isCurrentlyActive ? 'text-luma-lime font-bold' : ''}>Action item</span>
-                          </span>
-                        ) : (
-                          <span
-                            className={`text-xs font-mono font-semibold uppercase tracking-wider ${durationColor}`}
-                          >
-                            {item.duration} MIN
-                          </span>
-                        )}
-                      </div>
+                      {item.target_label ? (
+                        <span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 ${isCurrentlyActive ? 'text-luma-lime border-luma-lime/40' : 'text-luma-lime'}`}>
+                          {item.target_label}
+                        </span>
+                      ) : item.is_untimed || item.duration === 0 ? (
+                        <span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 flex items-center gap-1 ${isCurrentlyActive ? 'text-luma-lime border-luma-lime/40' : 'text-luma-text-dim'}`}>
+                          <span className={isCurrentlyActive ? 'text-luma-lime' : ''}>⚡</span>
+                          <span className={isCurrentlyActive ? 'text-luma-lime font-bold' : ''}>Action item</span>
+                        </span>
+                      ) : (
+                        <span
+                          className={`text-xs font-mono font-semibold uppercase tracking-wider ${durationColor}`}
+                        >
+                          {item.duration} MIN
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -323,17 +420,21 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
               <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-luma-text-dim mb-3">
                 <Calendar className="w-6 h-6 stroke-[1.5]" />
               </div>
-              <p className="text-sm font-medium text-white mb-1">No schedule for {isSelectedToday ? 'today' : fullDayNames[selectedDay]}</p>
+              <p className="text-sm font-medium text-white mb-1">
+                No schedule for {isSelectedToday ? 'today' : fullDayNames[selectedDayCode]}
+              </p>
               <p className="text-xs text-luma-text-muted max-w-sm mb-4">
-                Your daily timetable has not been generated yet. Click below to shape your day with AI.
+                {isSelectedToday
+                  ? 'Your daily timetable has not been generated yet. Click below to shape your day with AI.'
+                  : `Your timetable for ${fullDayNames[selectedDayCode]} (${selectedDayItem.date} ${selectedDayItem.fullDate.toLocaleDateString('en-US', { month: 'short' })}) is currently unshaped.`}
               </p>
               {onOpenShapeMyDay && (
                 <button
-                  onClick={onOpenShapeMyDay}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-luma-lime text-black font-semibold text-xs shadow-lime-glow hover:bg-luma-lime-hover transition-all"
+                  onClick={() => onOpenShapeMyDay(selectedDateStr)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-luma-lime text-black font-semibold text-xs shadow-lime-glow hover:bg-luma-lime-hover transition-all active:scale-95"
                 >
                   <Sparkles className="w-3.5 h-3.5 stroke-[2]" />
-                  <span>Shape my day with AI</span>
+                  <span>Shape {isSelectedToday ? 'my day' : fullDayNames[selectedDayCode]} with AI</span>
                 </button>
               )}
             </div>
@@ -352,7 +453,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
             <div className="absolute bottom-0 right-0 w-28 h-28 rounded-tl-full bg-[#9f8ff5]/30 pointer-events-none" />
 
             <div className="relative z-10">
-              {schedule.length === 0 ? (
+              {activeDaySchedule.length === 0 ? (
                 <>
                   <div className="text-[10px] font-mono tracking-widest uppercase text-[#5a604f] mb-3">
                     NO COMMITMENTS SCHEDULED
@@ -363,16 +464,18 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                   </h3>
 
                   <p className="text-xs text-[#52574e] mb-6">
-                    Add tasks, daily habits, or weekly goals to generate an energy-aligned timetable.
+                    {isSelectedToday
+                      ? 'Add tasks, daily habits, or weekly goals to generate an energy-aligned timetable.'
+                      : `No focus blocks scheduled for ${fullDayNames[selectedDayCode]}. Shape this day in advance with AI.`}
                   </p>
 
                   {onOpenShapeMyDay && (
                     <button
-                      onClick={onOpenShapeMyDay}
-                      className="flex items-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-5 py-3 rounded-2xl font-semibold text-xs shadow-md active:scale-95 transition-all"
+                      onClick={() => onOpenShapeMyDay(selectedDateStr)}
+                      className="inline-flex items-center gap-2 bg-[#121312] text-white px-5 py-3 rounded-2xl text-xs font-semibold shadow-md hover:bg-black transition-all"
                     >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Shape my day</span>
+                      <Sparkles className="w-4 h-4 text-luma-lime" />
+                      <span>Shape {isSelectedToday ? 'today' : fullDayNames[selectedDayCode]} with AI</span>
                     </button>
                   )}
                 </>
@@ -420,13 +523,13 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
             </div>
           </div>
 
-          {/* Card 2: Why this works */}
+          {/* Card 3: Why this works */}
           <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6">
             <div className="text-[10px] font-mono tracking-widest uppercase text-luma-text-dim mb-3">
               Why this works
             </div>
             <p className="text-xs text-luma-text-muted leading-relaxed">
-              {schedule.length > 0 ? (
+              {activeDaySchedule.length > 0 ? (
                 <>
                   <strong className="text-white font-medium">Energy-aligned:</strong> deeper work sits before coaching. The light review is intentionally saved for your post-lunch dip.
                 </>

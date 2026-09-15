@@ -131,16 +131,18 @@ export function getDomainTheme(category?: string): DomainTheme {
 
 interface ShapeMyDayModalProps {
   isOpen: boolean;
+  targetDate?: string;
   habits?: Habit[];
   weeklyGoals?: WeeklyGoal[];
   tasks?: Task[];
   goals?: Goal[];
   onClose: () => void;
-  onSubmit: (answers: QuestionnaireAnswers) => Promise<void>;
+  onSubmit: (answers: QuestionnaireAnswers, targetDate?: string) => Promise<void>;
 }
 
 export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
   isOpen,
+  targetDate,
   habits = [],
   weeklyGoals = [],
   tasks = [],
@@ -404,7 +406,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
         selected_long_term_goal_ids: selectedLongTermGoalIds,
         long_term_goal_configs: longTermConfigsPayload,
         morning_todos: morningTodos,
-      });
+      }, targetDate);
       onClose();
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to synthesize timetable. Please try again.');
@@ -428,13 +430,26 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
             </div>
             <div>
               <h2 className="text-xl font-serif font-bold text-white tracking-tight flex items-center gap-2">
-                <span>Shape My Day</span>
+                <span>
+                  {targetDate ? (() => {
+                    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+                    if (targetDate === todayIST) return 'Shape My Day';
+                    const d = new Date(targetDate + 'T00:00:00');
+                    return `Shape ${d.toLocaleDateString('en-US', { weekday: 'long' })}`;
+                  })() : 'Shape My Day'}
+                </span>
                 <span className="text-[11px] font-sans font-normal px-2 py-0.5 rounded-full bg-luma-lime/10 text-luma-lime border border-luma-lime/20">
                   AI Rhythm Architect
                 </span>
               </h2>
               <p className="text-xs text-luma-text-muted mt-0.5">
-                Merge today's tasks, monthly habits, and weekly goals into a conflict-free, sustainable schedule.
+                {targetDate ? (() => {
+                  const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+                  if (targetDate === todayIST) return "Merge today's tasks, monthly habits, and weekly goals into a conflict-free, sustainable schedule.";
+                  const d = new Date(targetDate + 'T00:00:00');
+                  const dayName = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+                  return `Design a customized timetable for ${dayName}.`;
+                })() : "Merge today's tasks, monthly habits, and weekly goals into a conflict-free, sustainable schedule."}
               </p>
             </div>
           </div>

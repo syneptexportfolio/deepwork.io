@@ -28,6 +28,7 @@ export const App: React.FC = () => {
 
   // Modals & Flows
   const [isShapeMyDayOpen, setIsShapeMyDayOpen] = useState(false);
+  const [shapeTargetDate, setShapeTargetDate] = useState<string | undefined>(undefined);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -111,22 +112,21 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleToggleScheduleStatus = async (scheduleId: string) => {
+  const handleToggleScheduleStatus = async (scheduleId: string, dateStr?: string) => {
     const block = schedule.find(s => s.id === scheduleId);
-    if (!block) return;
-    const newStatus = block.status === 'done' ? 'pending' : 'done';
+    const newStatus = block ? (block.status === 'done' ? 'pending' : 'done') : 'done';
 
     if (newStatus === 'done') {
       confetti({ particleCount: 60, spread: 50, origin: { y: 0.7 } });
     }
 
     setSchedule(prev => prev.map(s => s.id === scheduleId ? { ...s, status: newStatus } : s));
-    if (block.task_id) {
+    if (block && block.task_id) {
       setTasks(prev => prev.map(t => t.id === block.task_id ? { ...t, status: newStatus } : t));
     }
 
     try {
-      await api.updateScheduleBlock(scheduleId, newStatus);
+      await api.updateScheduleBlock(scheduleId, newStatus, dateStr);
       const statsRes = await api.getStats();
       if (statsRes.stats) setStats(statsRes.stats);
     } catch (err) {
@@ -255,11 +255,14 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleShapeMyDaySubmit = async (answers: QuestionnaireAnswers) => {
+  const handleShapeMyDaySubmit = async (answers: QuestionnaireAnswers, targetDate?: string) => {
     await api.submitQuestionnaire(answers);
-    const res = await api.generateSchedule(answers);
+    const res = await api.generateSchedule(answers, targetDate);
     if (res.schedule) {
-      setSchedule(res.schedule);
+      const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+      if (!targetDate || targetDate === todayIST) {
+        setSchedule(res.schedule);
+      }
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.5 } });
     }
     await loadData();
@@ -366,7 +369,10 @@ export const App: React.FC = () => {
             setFocusSession({ isOpen: true, taskTitle, durationMinutes, blockId })
           }
           onAdjustCapacity={() => setIsSettingsOpen(true)}
-          onOpenShapeMyDay={() => setIsShapeMyDayOpen(true)}
+          onOpenShapeMyDay={(targetDate) => {
+            setShapeTargetDate(targetDate);
+            setIsShapeMyDayOpen(true);
+          }}
         />
       )}
 
@@ -416,11 +422,15 @@ export const App: React.FC = () => {
       {/* Modals */}
       <ShapeMyDayModal
         isOpen={isShapeMyDayOpen}
+        targetDate={shapeTargetDate}
         habits={habits}
         weeklyGoals={weeklyGoals}
         tasks={tasks}
         goals={goals}
-        onClose={() => setIsShapeMyDayOpen(false)}
+        onClose={() => {
+          setIsShapeMyDayOpen(false);
+          setShapeTargetDate(undefined);
+        }}
         onSubmit={handleShapeMyDaySubmit}
       />
 

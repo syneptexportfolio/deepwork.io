@@ -306,25 +306,31 @@ export const api = {
   getTodaySchedule: () =>
     request<{ success: boolean; date: string; cached: boolean; schedule: ScheduleBlock[] }>('/api/schedule/today'),
 
+  getScheduleByDate: (date: string) =>
+    request<{ success: boolean; date: string; cached: boolean; schedule: ScheduleBlock[] }>(`/api/schedule?date=${encodeURIComponent(date)}`),
+
+  getActiveScheduleDates: () =>
+    request<{ success: boolean; dates: string[] }>('/api/schedule/active-dates'),
+
   submitQuestionnaire: (answers: QuestionnaireAnswers) =>
     request<{ success: boolean; id: string; date: string }>('/api/schedule/questionnaire', {
       method: 'POST',
       body: JSON.stringify({ answers }),
     }),
 
-  generateSchedule: (answers?: QuestionnaireAnswers) =>
+  generateSchedule: (answers?: QuestionnaireAnswers, date?: string) =>
     request<{ success: boolean; date: string; cached: boolean; schedule: ScheduleBlock[]; modelUsed?: string }>(
       '/api/schedule/generate',
       {
         method: 'POST',
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify({ answers, date }),
       }
     ),
 
-  updateScheduleBlock: (blockId: string, status: 'pending' | 'done') =>
+  updateScheduleBlock: (blockId: string, status: 'pending' | 'done', date?: string) =>
     request<{ success: boolean; schedule: ScheduleBlock[] }>(`/api/schedule/block/${blockId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, date }),
     }),
 
   // Stats
