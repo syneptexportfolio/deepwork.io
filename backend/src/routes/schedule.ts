@@ -149,6 +149,17 @@ scheduleRouter.delete('/today', async (c) => {
   }
 });
 
+// DELETE /api/schedule/by-date/:date
+scheduleRouter.delete('/by-date/:date', async (c) => {
+  try {
+    const targetDate = c.req.param('date');
+    await c.env.DB.prepare('DELETE FROM schedules WHERE date = ?').bind(targetDate).run();
+    return c.json({ success: true, message: `Schedule for ${targetDate} cleared` });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
+
 // POST /api/questionnaire
 scheduleRouter.post('/questionnaire', async (c) => {
   try {

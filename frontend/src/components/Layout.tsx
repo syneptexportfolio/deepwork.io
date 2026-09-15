@@ -144,14 +144,16 @@ export const Layout: React.FC<LayoutProps> = ({
               <Settings className="w-3.5 h-3.5 text-black/60 opacity-0 group-hover:opacity-100 transition-opacity" />
             </button>
 
-            {/* Shape My Day Button */}
-            <button
-              onClick={onOpenShapeMyDay}
-              className="flex items-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-4 py-2.5 rounded-xl font-semibold text-sm shadow-lime-glow active:scale-[0.98] transition-all"
-            >
-              <Sparkles className="w-4 h-4 text-black stroke-[2.2]" />
-              <span>Shape my day</span>
-            </button>
+            {/* Shape My Day Button (Hidden on Daily Plan page to avoid duplicate stacked buttons) */}
+            {currentTab !== 'daily' && (
+              <button
+                onClick={onOpenShapeMyDay}
+                className="flex items-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-4 py-2.5 rounded-xl font-semibold text-sm shadow-lime-glow active:scale-[0.98] transition-all"
+              >
+                <Sparkles className="w-4 h-4 text-black stroke-[2.2]" />
+                <span>Shape my day</span>
+              </button>
+            )}
           </div>
         </header>
 
