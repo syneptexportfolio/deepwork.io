@@ -323,8 +323,27 @@ export const Tasks: React.FC<TasksProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {habits.map((habit) => {
+          {habits.length === 0 ? (
+            <div className="p-12 text-center rounded-3xl border border-dashed border-white/10 bg-[#161716]/60 flex flex-col items-center justify-center my-2">
+              <div className="w-12 h-12 rounded-2xl bg-luma-purple/10 border border-luma-purple/20 flex items-center justify-center text-luma-purple mb-3">
+                <Flame className="w-6 h-6 stroke-[1.5]" />
+              </div>
+              <h4 className="text-base font-semibold text-white mb-1">No daily habits configured</h4>
+              <p className="text-xs text-luma-text-muted max-w-sm mb-5 leading-relaxed">
+                Build consistent momentum by defining recurring morning anchors, deep focus rituals, or evening wind-downs.
+              </p>
+              <button
+                type="button"
+                onClick={onAddHabit}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-luma-purple hover:bg-luma-purple-glow text-white text-xs font-semibold shadow-purple-glow transition-all active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Add your first habit</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {habits.map((habit) => {
               const AnchorIcon = habit.anchor === 'morning' ? Sun : habit.anchor === 'floating' ? Waves : Moon;
               const anchorColor = habit.anchor === 'morning' ? 'text-amber-400' : habit.anchor === 'floating' ? 'text-[#4287f5]' : 'text-luma-purple';
               const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
@@ -487,6 +506,7 @@ export const Tasks: React.FC<TasksProps> = ({
               );
             })}
           </div>
+          )}
         </div>
       )}
 
@@ -515,8 +535,27 @@ export const Tasks: React.FC<TasksProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {weeklyGoals.map((wg) => {
+          {weeklyGoals.length === 0 ? (
+            <div className="p-12 text-center rounded-3xl border border-dashed border-white/10 bg-[#161716]/60 flex flex-col items-center justify-center my-2">
+              <div className="w-12 h-12 rounded-2xl bg-luma-lime/10 border border-luma-lime/20 flex items-center justify-center text-luma-lime mb-3">
+                <Target className="w-6 h-6 stroke-[1.5]" />
+              </div>
+              <h4 className="text-base font-semibold text-white mb-1">No weekly target goals set</h4>
+              <p className="text-xs text-luma-text-muted max-w-sm mb-5 leading-relaxed">
+                Set high-leverage weekly targets for your projects, exams, or craft. The timetable scheduler will automatically protect focus blocks to keep you on pace.
+              </p>
+              <button
+                type="button"
+                onClick={onAddWeeklyGoal}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-luma-lime hover:bg-luma-lime-hover text-black text-xs font-semibold shadow-lime-glow transition-all active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>New weekly goal</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {weeklyGoals.map((wg) => {
               const progress = wg.progressPercent || Math.round((wg.completed_units / Math.max(wg.target_units, 1)) * 100);
               const cat = (wg.category || 'Project').toLowerCase();
               let badgeStyle = { label: 'PROJECT', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' };
@@ -645,6 +684,7 @@ export const Tasks: React.FC<TasksProps> = ({
               );
             })}
           </div>
+          )}
         </div>
       )}
     </div>

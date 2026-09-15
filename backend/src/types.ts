@@ -7,6 +7,7 @@ export interface Env {
   PASSCODE?: string;
   DEFAULT_LEAD_TIME_MINUTES?: string;
   ENVIRONMENT?: string;
+  ALLOWED_ORIGIN?: string;
 }
 
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';

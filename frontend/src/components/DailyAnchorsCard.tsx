@@ -119,28 +119,36 @@ export const DailyAnchorsCard: React.FC<DailyAnchorsCardProps> = ({
         </div>
 
         {/* Completed badge */}
-        <div className="text-right">
-          <span className="text-[11px] font-mono font-bold text-luma-lime px-2.5 py-1 rounded-full bg-luma-lime/10 border border-luma-lime/20">
-            {completedCount}/{activeHabits.length} done
-          </span>
-        </div>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="relative z-10 mb-5">
-        <div className="w-full bg-[#141514] h-1 rounded-full overflow-hidden border border-white/[0.04]">
-          <div
-            className="h-full bg-luma-lime transition-all duration-500"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
+        {activeHabits.length > 0 && (
+          <div className="text-right">
+            <span className="text-[11px] font-mono font-bold text-luma-lime px-2.5 py-1 rounded-full bg-luma-lime/10 border border-luma-lime/20">
+              {completedCount}/{activeHabits.length} done
+            </span>
+          </div>
+        )}
       </div>
 
       {activeHabits.length === 0 ? (
-        <div className="text-center py-6 text-xs text-luma-text-dim bg-[#141514] rounded-2xl border border-white/[0.04]">
-          No active habits configured. Add habits in Tasks & Cadence!
+        <div className="text-center py-8 px-4 text-xs text-luma-text-dim bg-[#141514] rounded-2xl border border-white/[0.04] space-y-2">
+          <div className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center mx-auto text-luma-text-dim">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <p className="text-white/80 font-medium text-xs">No active habits configured</p>
+          <p className="text-[11px] text-luma-text-muted max-w-xs mx-auto">
+            Add recurring daily habits or anchors in Tasks & Cadence to build your rhythm.
+          </p>
         </div>
       ) : (
+        <>
+          {/* Progress Bar */}
+          <div className="relative z-10 mb-5">
+            <div className="w-full bg-[#141514] h-1 rounded-full overflow-hidden border border-white/[0.04]">
+              <div
+                className="h-full bg-luma-lime transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
         <div className="space-y-4 max-h-[460px] overflow-y-auto custom-scrollbar pr-1 relative z-10">
           
           {/* 1. Anchors & Morning Milestones */}
@@ -196,6 +204,7 @@ export const DailyAnchorsCard: React.FC<DailyAnchorsCardProps> = ({
           )}
 
         </div>
+        </>
       )}
     </div>
   );

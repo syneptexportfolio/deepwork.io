@@ -25,15 +25,3 @@ CREATE TABLE IF NOT EXISTS weekly_goals (
     goal_id TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-
--- Seed initial monthly habits
-INSERT INTO habits (id, title, duration_minutes, anchor, energy_level, streak_count, active_days, is_active) VALUES
-('hab-1', 'Morning planning & mindset', 15, 'morning', 'light', 14, '["M","T","W","T","F","S","S"]', 1),
-('hab-2', 'Organic chemistry & formula flashcards', 25, 'floating', 'light', 9, '["M","T","W","T","F","S","S"]', 1),
-('hab-3', 'Night review & reading', 30, 'evening', 'light', 21, '["M","T","W","T","F","S","S"]', 1);
-
--- Seed initial weekly goals for current week
-INSERT INTO weekly_goals (id, title, target_units, completed_units, unit_label, week_start, week_end, priority, energy_level, goal_id) VALUES
-('wg-1', 'Calculus: 6 Integration topics', 6, 3, 'topics', '2026-09-08', '2026-09-14', 'HIGH', 'deep_focus', 'goal-jee'),
-('wg-2', 'Physics: 40 EM field problems', 40, 24, 'problems', '2026-09-08', '2026-09-14', 'HIGH', 'deep_focus', 'goal-jee'),
-('wg-3', 'Data Structures: 4 Linked list algorithms', 4, 2, 'algorithms', '2026-09-08', '2026-09-14', 'MEDIUM', 'deep_focus', 'goal-ds');
