@@ -12,19 +12,30 @@ import { passcodeAuth } from './middleware/auth';
 
 const app = new Hono<{ Bindings: Env }>();
 
+// Security Headers
+app.use('*', async (c, next) => {
+  await next();
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('X-Frame-Options', 'DENY');
+  c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+});
+
 // Enable CORS for frontend
-app.use('*', cors({
-  origin: '*',
-  allowHeaders: ['Content-Type', 'X-Passcode', 'Authorization'],
-  allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
-}));
+app.use('*', async (c, next) => {
+  const allowedOrigin = c.env.ALLOWED_ORIGIN || '*';
+  return cors({
+    origin: allowedOrigin,
+    allowHeaders: ['Content-Type', 'X-Passcode', 'Authorization'],
+    allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
+  })(c, next);
+});
 
 // Public Health Check & Config Status
 app.get('/api/health', (c) => {
   const now = new Date();
   return c.json({
     status: 'ok',
-    app: 'Luma Personal Task & Timetable Assistant',
+    app: 'deepwork.io — Cognitive Rhythm & Daily Architecture',
     environment: c.env.ENVIRONMENT || 'development',
     timeIST: now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }),
     dateIST: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now),

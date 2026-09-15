@@ -1,4 +1,5 @@
--- Cloudflare D1 Migration: 0002_seed_data.sql
+-- Seed Data: backend/seeds/seed_data.sql
+-- Use for local development and testing only: npm run d1:seed
 
 DELETE FROM tasks;
 DELETE FROM goals;
@@ -6,10 +7,11 @@ DELETE FROM schedules;
 DELETE FROM questionnaire_responses;
 
 -- Insert Goals
-INSERT INTO goals (id, title, target_date, syllabus, milestones, recommendation, unit_label, total_units, covered_units) VALUES
+INSERT INTO goals (id, title, category, target_date, syllabus, milestones, recommendation, unit_label, total_units, covered_units) VALUES
 (
     'goal-jee',
     'JEE Main preparation',
+    'Exam / Academic',
     '2026-12-08',
     '[
         {"id": "top-1", "name": "Limits & continuity", "status": "COVERED", "covered": true, "weight": "MEDIUM"},
@@ -31,6 +33,7 @@ INSERT INTO goals (id, title, target_date, syllabus, milestones, recommendation,
 (
     'goal-ds',
     'Data structures',
+    'Project / Build',
     '2026-10-04',
     '[
         {"id": "top-ds-1", "name": "Arrays & Strings", "status": "COVERED", "covered": true, "weight": "LOW"},
@@ -49,6 +52,7 @@ INSERT INTO goals (id, title, target_date, syllabus, milestones, recommendation,
 (
     'goal-reading',
     'Reading year',
+    'Skill / Mastery',
     '2026-12-31',
     '[
         {"id": "top-rd-1", "name": "Deep Work - Cal Newport", "status": "COVERED", "covered": true, "weight": "MEDIUM"},

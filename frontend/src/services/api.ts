@@ -164,6 +164,8 @@ export interface StatsResponse {
 
 const PASSCODE_STORAGE_KEY = 'luma_passcode';
 
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
 export function getStoredPasscode(): string {
   return localStorage.getItem(PASSCODE_STORAGE_KEY) || '';
 }
@@ -180,7 +182,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers.set('X-Passcode', passcode);
   }
 
-  const response = await fetch(endpoint, {
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+  const response = await fetch(url, {
     ...options,
     headers,
   });

@@ -1,12 +1,14 @@
-name = "luma-backend"
+name = "deepwork-backend"
 main = "src/index.ts"
 compatibility_date = "2024-09-01"
 compatibility_flags = ["nodejs_compat"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "luma-db"
-database_id = "luma-db-id-placeholder"
+database_name = "deepwork-db"
+# Provision remote database: npx wrangler d1 create deepwork-db
+# Paste the resulting UUID into database_id before 'wrangler deploy'
+database_id = "deepwork-db-id-placeholder"
 migrations_dir = "migrations"
 
 [triggers]
@@ -16,9 +18,10 @@ crons = ["*/5 * * * *"]
 ENVIRONMENT = "development"
 DEFAULT_LEAD_TIME_MINUTES = "10"
 GEMINI_MODEL = "gemini-1.5-flash"
+ALLOWED_ORIGIN = "*"
 
-# Secrets to configure via `wrangler secret put <KEY>`:
-# - GEMINI_API_KEY
-# - TELEGRAM_BOT_TOKEN
-# - TELEGRAM_CHAT_ID
-# - PASSCODE
+# Required Secrets to configure via `npx wrangler secret put <KEY>`:
+# - PASSCODE (Required for production authentication)
+# - GEMINI_API_KEY (Google AI Studio Gemini key)
+# - TELEGRAM_BOT_TOKEN (Telegram Bot Token)
+# - TELEGRAM_CHAT_ID (Telegram Chat ID)

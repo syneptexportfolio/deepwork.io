@@ -9,19 +9,23 @@ statsRouter.get('/', async (c) => {
     const { results: tasks } = await c.env.DB.prepare('SELECT * FROM tasks').all<Task>();
     const allTasks = tasks || [];
 
-    // Check today's or latest schedule
-    const schedRow = await c.env.DB.prepare(
-      'SELECT * FROM schedules ORDER BY created_at DESC LIMIT 1'
-    ).first<any>();
+    // Check all schedules for historical pattern calculation
+    const { results: allSchedules } = await c.env.DB.prepare(
+      'SELECT id, date, generated_plan FROM schedules ORDER BY date ASC'
+    ).all<any>();
+    const scheduleRows = allSchedules || [];
+
+    // Today's or latest schedule
+    const latestSched = scheduleRows.length > 0 ? scheduleRows[scheduleRows.length - 1] : null;
 
     let focusMinutes = 0;
     let doneCount = 0;
     let totalCount = 0;
     let nextSession = '10:30';
 
-    if (schedRow && schedRow.generated_plan) {
+    if (latestSched && latestSched.generated_plan) {
       try {
-        const blocks: any[] = JSON.parse(schedRow.generated_plan);
+        const blocks: any[] = JSON.parse(latestSched.generated_plan);
         const activeBlocks = blocks.filter(b => b.type !== 'break');
         const doneBlocks = activeBlocks.filter(b => b.status === 'done');
         const nextPending = activeBlocks.find(b => b.status === 'pending');
@@ -52,25 +56,136 @@ statsRouter.get('/', async (c) => {
         .reduce((sum, t) => sum + (t.duration_minutes || 0), 0);
     }
 
-    const hasAnyContent = allTasks.length > 0 || totalCount > 0;
+    const hasAnyContent = allTasks.length > 0 || totalCount > 0 || scheduleRows.length > 0;
     const focusHours = Math.floor(focusMinutes / 60);
     const remainingMinutes = focusMinutes % 60;
     const focusFormatted = focusMinutes > 0 ? `${focusHours}h ${remainingMinutes}m` : '0h 0m';
     const rhythmRate = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
     const promisesFormatted = totalCount > 0 ? `${doneCount}/${totalCount}` : '0/0';
+
     if (!hasAnyContent) {
       nextSession = 'None scheduled';
     }
 
-    const currentCapHours = hasAnyContent ? Math.max(Math.round(focusMinutes / 60) + 18, 24) : 0;
-    const capPercentage = hasAnyContent ? Math.min(100, Math.round((currentCapHours / 32) * 100)) : 0;
+    // Dynamic Weekly Pattern (Mon - Sun of current week)
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const distToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + distToMonday);
+
+    const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    const scheduleByDate = new Map<string, any[]>();
+    for (const row of scheduleRows) {
+      try {
+        scheduleByDate.set(row.date, JSON.parse(row.generated_plan));
+      } catch {}
+    }
+
+    let totalWeekFocusHours = 0;
+    const weeklyPatternDays = dayLabels.map((dayLabel, idx) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + idx);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayBlocks = scheduleByDate.get(dateStr) || [];
+
+      const dayFocusMins = dayBlocks
+        .filter(b => b.type === 'deep_focus')
+        .reduce((sum, b) => sum + (b.duration || 0), 0);
+      const hrs = Math.round((dayFocusMins / 60) * 10) / 10;
+      totalWeekFocusHours += hrs;
+
+      return {
+        day: dayLabel,
+        heightPercent: Math.min(100, Math.round((hrs / 8) * 100)),
+        hours: hrs
+      };
+    });
+
+    // Dynamic Weekly Capacity
+    const maxCapacityHours = 32;
+    const currentCapHours = Math.round(totalWeekFocusHours > 0 ? totalWeekFocusHours : (focusMinutes / 60));
+    const capPercentage = Math.min(100, Math.round((currentCapHours / maxCapacityHours) * 100));
+
+    // Dynamic Time-of-Day Split (Morning vs Afternoon completion)
+    let totalMorningDone = 0;
+    let totalAfternoonDone = 0;
+    for (const [, blocks] of scheduleByDate) {
+      for (const b of blocks) {
+        if (b.status === 'done' && b.type !== 'break') {
+          const startH = parseInt((b.start_time || '12:00').split(':')[0], 10);
+          if (startH < 12) totalMorningDone++;
+          else totalAfternoonDone++;
+        }
+      }
+    }
+    const totalDoneAll = totalMorningDone + totalAfternoonDone;
+    const morningPercent = totalDoneAll > 0 ? Math.round((totalMorningDone / totalDoneAll) * 100) : 50;
+    const afternoonPercent = totalDoneAll > 0 ? (100 - morningPercent) : 50;
+
+    // Dynamic Heatmap (Morning, Afternoon, Evening completion across the 7 days of the week)
+    const computePeriodRates = (filterFn: (startH: number) => boolean) => {
+      return dayLabels.map((_, idx) => {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + idx);
+        const dateStr = d.toISOString().split('T')[0];
+        const dayBlocks = (scheduleByDate.get(dateStr) || []).filter(b => {
+          if (b.type === 'break') return false;
+          const h = parseInt((b.start_time || '12:00').split(':')[0], 10);
+          return filterFn(h);
+        });
+        if (dayBlocks.length === 0) return 0;
+        const done = dayBlocks.filter(b => b.status === 'done').length;
+        return Math.round((done / dayBlocks.length) * 100);
+      });
+    };
+
+    const heatmap = [
+      { period: 'Morning', days: computePeriodRates(h => h < 12) },
+      { period: 'Afternoon', days: computePeriodRates(h => h >= 12 && h < 17) },
+      { period: 'Evening', days: computePeriodRates(h => h >= 17) }
+    ];
+
+    // Dynamic Trend Points (Last up to 10 recorded schedule days)
+    let trendPoints: Array<{ date: string; value: number }> = [];
+    if (scheduleRows.length > 0) {
+      trendPoints = scheduleRows.slice(-10).map((row: any) => {
+        try {
+          const blocks: any[] = JSON.parse(row.generated_plan);
+          const active = blocks.filter(b => b.type !== 'break');
+          const done = active.filter(b => b.status === 'done').length;
+          const rate = active.length > 0 ? Math.round((done / active.length) * 100) : 0;
+          const dObj = new Date(row.date);
+          const label = isNaN(dObj.getTime())
+            ? row.date
+            : dObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          return { date: label, value: rate };
+        } catch {
+          return { date: row.date, value: 0 };
+        }
+      });
+    } else {
+      trendPoints = [{ date: 'Today', value: rhythmRate }];
+    }
+
+    // Dynamic Insight
+    let insight = 'No focus blocks logged yet. Generate your daily plan or add tasks to build your personal rhythm analytics.';
+    if (hasAnyContent) {
+      if (totalMorningDone > totalAfternoonDone) {
+        insight = `Morning focus blocks have a ${morningPercent}% completion rate. Keep your highest-weight priorities before lunch.`;
+      } else if (totalAfternoonDone > totalMorningDone) {
+        insight = `Afternoon momentum is strong (${afternoonPercent}%). Schedule your deep building sprints post-lunch.`;
+      } else {
+        insight = 'Your daily rhythm is balanced across morning and afternoon focus sessions. Maintain steady pacing.';
+      }
+    }
 
     return c.json({
       success: true,
       stats: {
         protectedFocus: {
           formatted: focusFormatted,
-          difference: hasAnyContent ? '+45m from yesterday' : '0m',
+          difference: totalCount > 0 ? `+${focusMinutes}m planned today` : '0m',
           totalMinutes: focusMinutes
         },
         promisesKept: {
@@ -81,66 +196,20 @@ statsRouter.get('/', async (c) => {
         },
         weeklyRhythm: {
           rate: rhythmRate,
-          diff: hasAnyContent ? '↑ 12% stronger' : '0%'
+          diff: rhythmRate > 0 ? `↑ ${rhythmRate}% completion rate` : '0%'
         },
         weeklyCapacity: {
           currentHours: currentCapHours,
-          maxHours: 32,
+          maxHours: maxCapacityHours,
           percentage: capPercentage
         },
-        weeklyPatternDays: hasAnyContent ? [
-          { day: 'M', heightPercent: 45, hours: 3.5 },
-          { day: 'T', heightPercent: 70, hours: 5.0 },
-          { day: 'W', heightPercent: 35, hours: 2.5 },
-          { day: 'T', heightPercent: 85, hours: 6.0 },
-          { day: 'F', heightPercent: 60, hours: 4.5 },
-          { day: 'S', heightPercent: 95, hours: 7.0 },
-          { day: 'S', heightPercent: Math.max(rhythmRate, 30), hours: 5.5 }
-        ] : [
-          { day: 'M', heightPercent: 0, hours: 0 },
-          { day: 'T', heightPercent: 0, hours: 0 },
-          { day: 'W', heightPercent: 0, hours: 0 },
-          { day: 'T', heightPercent: 0, hours: 0 },
-          { day: 'F', heightPercent: 0, hours: 0 },
-          { day: 'S', heightPercent: 0, hours: 0 },
-          { day: 'S', heightPercent: 0, hours: 0 }
-        ],
+        weeklyPatternDays,
         patterns: {
-          morningPercent: hasAnyContent ? 69 : 0,
-          afternoonPercent: hasAnyContent ? 31 : 0,
-          insight: hasAnyContent 
-            ? 'Morning focus blocks are completed 27% more often than afternoon blocks. Keep the hardest topic before lunch.'
-            : 'No focus blocks logged yet. Generate your daily plan or add tasks to see rhythm patterns.',
-          heatmap: hasAnyContent ? [
-            { period: 'Morning', days: [60, 95, 75, 90, 70, 40, 65] },
-            { period: 'Afternoon', days: [30, 40, 50, 45, 40, 20, 35] },
-            { period: 'Evening', days: [55, 35, 40, 65, 50, 55, 45] }
-          ] : [
-            { period: 'Morning', days: [0, 0, 0, 0, 0, 0, 0] },
-            { period: 'Afternoon', days: [0, 0, 0, 0, 0, 0, 0] },
-            { period: 'Evening', days: [0, 0, 0, 0, 0, 0, 0] }
-          ],
-          trendPoints: hasAnyContent ? [
-            { date: 'Aug 15', value: 42 },
-            { date: 'Aug 18', value: 40 },
-            { date: 'Aug 22', value: 55 },
-            { date: 'Aug 25', value: 48 },
-            { date: 'Aug 29', value: 68 },
-            { date: 'Sep 02', value: 64 },
-            { date: 'Sep 06', value: 72 },
-            { date: 'Sep 09', value: 80 },
-            { date: 'Sep 13', value: rhythmRate }
-          ] : [
-            { date: 'Aug 15', value: 0 },
-            { date: 'Aug 18', value: 0 },
-            { date: 'Aug 22', value: 0 },
-            { date: 'Aug 25', value: 0 },
-            { date: 'Aug 29', value: 0 },
-            { date: 'Sep 02', value: 0 },
-            { date: 'Sep 06', value: 0 },
-            { date: 'Sep 09', value: 0 },
-            { date: 'Sep 13', value: 0 }
-          ]
+          morningPercent,
+          afternoonPercent,
+          insight,
+          heatmap,
+          trendPoints
         }
       }
     });

@@ -4,8 +4,14 @@ import { Env } from '../types';
 export const passcodeAuth: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
   const passcode = c.env.PASSCODE;
 
-  // If no passcode is set in environment secrets, allow access
+  // In production, an unset PASSCODE is a critical misconfiguration
   if (!passcode || passcode.trim() === '') {
+    if (c.env.ENVIRONMENT === 'production') {
+      return c.json({
+        success: false,
+        error: 'Security Error: PASSCODE secret must be configured in production.'
+      }, 503);
+    }
     return next();
   }
 
