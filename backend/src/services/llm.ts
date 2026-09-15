@@ -107,7 +107,7 @@ function buildGeminiPrompt(
   return `You are Luma, an elite personal AI timetable and cognitive rhythm architect.
 Your goal is to build an optimal, sustainable daily schedule for a user in IST timezone.
 
-THE 4-TIER HIERARCHY TO MERGE TODAY:
+THE 3-TIER COGNITIVE HIERARCHY TO MERGE TODAY:
 1. DAILY HABITS (Set monthly, repeating daily anchors):
 ${JSON.stringify(selectedHabits.map(h => ({ 
   id: h.id, 
@@ -138,16 +138,7 @@ ${JSON.stringify(selectedLongTermGoals.map(g => {
   };
 }), null, 2)}
 
-3. WEEKLY GOALS (Set weekly, pace targets to advance today):
-${JSON.stringify(selectedWeeklyGoals.map(w => ({ 
-  id: w.id, 
-  title: w.title, 
-  progress: `${w.completed_units}/${w.target_units} ${w.unit_label}`, 
-  priority: w.priority, 
-  energy: w.energy_level 
-})), null, 2)}
-
-4. DAILY TASKS & TO-DOS (Divided by time of day):
+3. DAILY TASKS & TO-DOS (Divided by time of day):
 ${JSON.stringify([
   ...selectedTasks.map(t => ({
     id: t.id as string | null,
@@ -194,14 +185,14 @@ SCHEDULING RULES:
    - Post-work window (${answers.work_end_time || '18:00'} → ${answers.sleep_time}): Reserved STRICTLY for personal wind-down, dinner, and evening lifestyle habits (e.g. reading, meditation). NEVER schedule work tasks, client outreach, or team meetings in this window.
    - ZERO OVERLAPS: Ensure no two blocks overlap in time. Each block's start_time must be greater than or equal to the previous block's end_time.
    ${answers.lunch_start_time ? `- Midday Lunch Break: Insert a "Step away & recharge" or "Lunch & recharge" break (block_source="break", category="Rest & Hydration") starting at ${answers.lunch_start_time} for ${answers.lunch_duration_minutes || 45} minutes.` : ''}
-5. DEEP FOCUS BLOCKS: Allocate prime 75-90m focus blocks for top weekly goals and HIGH priority tasks, and dedicated 60m focus blocks for any selected Long-Term Goal / Roadmap (block_source="long_term_goal", titled "[Goal Title]: [Next Topic]").
+5. DEEP FOCUS BLOCKS: Allocate prime 75-90m morning focus blocks for your Top Priority or HIGH priority tasks, and dedicated 60m focus blocks for any selected Long-Term Goal / Roadmap (block_source="long_term_goal", titled "[Goal Title]: [Next Topic]").
 6. AFTERNOON & REMAINING TASKS: Schedule afternoon and flexible work tasks in the afternoon work window before ${answers.work_end_time || '18:00'}. If there are more tasks than can fit before ${answers.work_end_time || '18:00'}, do NOT spill them past ${answers.work_end_time || '18:00'}—omit them from today's plan.
 7. POST-WORK WIND-DOWN: Only scheduled evening lifestyle habits (anchor='evening') may be placed after ${answers.work_end_time || '18:00'} towards sleep time.
 8. UNTIMED TASKS: For untimed tasks (duration 0, meetings, calls, errands), schedule them with "is_untimed": true and "target_label": "⚡ Action item" or "🕒 HH:MM".
 9. RECHARGE BREAKS: Insert 10-15 minute "Step away & recharge" breaks between deep work sessions.
 10. ASSIGN TASK IDs: For any block created from an existing task in the list, set "task_id" to that task's id; otherwise set null.
 11. TIME FORMAT: 24-hour "HH:MM".
-12. BLOCK SOURCE: One of: "habit", "weekly_goal", "long_term_goal", "daily_todo", "break".
+12. BLOCK SOURCE: One of: "habit", "long_term_goal", "daily_todo", "break".
 
 OUTPUT FORMAT:
 Return a valid JSON array of ScheduleBlock objects conforming strictly to this schema:
@@ -214,7 +205,7 @@ Return a valid JSON array of ScheduleBlock objects conforming strictly to this s
     "end_time": "09:00",
     "duration": 30,
     "type": "deep_focus" | "light" | "break",
-    "block_source": "habit" | "weekly_goal" | "long_term_goal" | "daily_todo" | "break",
+    "block_source": "habit" | "long_term_goal" | "daily_todo" | "break",
     "category": "category name",
     "status": "pending",
     "reasoning": "Reasoning for cognitive placement",
@@ -340,30 +331,29 @@ export function generateSmartFallbackSchedule(
   currentMinutes = Math.max(currentMinutes, workStartMin);
 
   // --- PRIME FOCUS PHASE (STARTS AT workStartMin) ---
-  // B. Prime Weekly Goal Deep Focus Block 1
-  const primaryGoal = activeWeeklyGoals[0];
-  const primaryTask = unfixedTasks.find(t => t.priority === 'HIGH' && !scheduledTitles.has(t.title.toLowerCase().trim()));
+  // B. Prime Morning Deep Focus Block (Stated main priority or top pending task)
+  const primaryTask = unfixedTasks.find(t => t.priority === 'HIGH' && !scheduledTitles.has(t.title.toLowerCase().trim())) || unfixedTasks[0];
   const dur1 = answers.energy_level === 'light' ? 60 : 90;
   const s1 = formatTime(currentMinutes);
   currentMinutes += dur1;
   const e1 = formatTime(currentMinutes);
 
-  const primaryTitle = primaryGoal 
-    ? primaryGoal.title 
-    : (primaryTask ? primaryTask.title : (answers.top_priority || 'Core Priority Deep Focus'));
+  const primaryTitle = answers.top_priority && answers.top_priority.trim() !== '' && answers.top_priority !== 'Core daily priorities'
+    ? answers.top_priority.trim()
+    : (primaryTask ? primaryTask.title : 'Core Priority Focus Sprint');
 
   blocks.push({
     id: `block-${blocks.length + 1}`,
-    task_id: primaryGoal ? null : (primaryTask?.id || null),
+    task_id: primaryTask?.id || null,
     title: primaryTitle,
     start_time: s1,
     end_time: e1,
     duration: dur1,
     type: 'deep_focus',
-    block_source: primaryGoal ? 'weekly_goal' : 'daily_todo',
-    category: primaryGoal ? 'Weekly Goal' : 'Deep Focus',
+    block_source: 'daily_todo',
+    category: primaryTask?.category || 'Deep Focus',
     status: 'pending',
-    reasoning: 'Prime morning cognitive peak allocated to main goal advancement.'
+    reasoning: 'Prime morning cognitive peak allocated to main priority advancement.'
   });
   scheduledTitles.add(primaryTitle.toLowerCase().trim());
 
@@ -444,12 +434,11 @@ export function generateSmartFallbackSchedule(
     }
   }
 
-  // F. Secondary Deep Block (Weekly Goal 2 or Secondary Task before lunch, if time permits)
-  const secondaryGoal = activeWeeklyGoals.length > 1 ? activeWeeklyGoals[1] : null;
+  // F. Secondary Deep Block (Secondary Task before lunch, if time permits)
   const secondaryTask = unfixedTasks.find(t => !scheduledTitles.has(t.title.toLowerCase().trim()));
 
-  if (secondaryGoal || secondaryTask) {
-    const secTitle = secondaryGoal ? secondaryGoal.title : secondaryTask!.title;
+  if (secondaryTask) {
+    const secTitle = secondaryTask.title;
     if (!scheduledTitles.has(secTitle.toLowerCase().trim())) {
       const dur2 = 60;
       if (lunchDur <= 0 || currentMinutes + dur2 <= lunchStartMin) {
@@ -459,14 +448,14 @@ export function generateSmartFallbackSchedule(
 
         blocks.push({
           id: `block-${blocks.length + 1}`,
-          task_id: secondaryGoal ? null : (secondaryTask?.id || null),
+          task_id: secondaryTask.id,
           title: secTitle,
           start_time: s2,
           end_time: e2,
           duration: dur2,
           type: 'deep_focus',
-          block_source: secondaryGoal ? 'weekly_goal' : 'daily_todo',
-          category: secondaryGoal ? 'Weekly Goal' : 'Deep Focus',
+          block_source: 'daily_todo',
+          category: secondaryTask.category || 'Deep Focus',
           status: 'pending',
           reasoning: 'Secondary deep block while focus reserves remain active.'
         });

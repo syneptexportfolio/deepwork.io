@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Flame, Sun, Waves, Moon, CheckCircle2, ArrowRight, Trash2, Pencil, RotateCcw, Target, Clock, Sparkles } from 'lucide-react';
+import { Plus, Flame, Sun, Waves, Moon, CheckCircle2, ArrowRight, Trash2, Pencil, RotateCcw, Target, Clock, Sparkles, Trophy, Calendar } from 'lucide-react';
 import { Habit, Task, WeeklyGoal } from '../services/api';
 import { DailyTaskVisualizer } from './visualizers/DailyTaskVisualizer';
 import { WeeklyGoalVisualizer } from './visualizers/WeeklyGoalVisualizer';
@@ -552,12 +552,12 @@ export const Tasks: React.FC<TasksProps> = ({
             <div>
               <h3 className="text-base font-semibold text-white mb-1">Weekly Target Goals</h3>
               <p className="text-xs text-luma-text-muted">
-                Set once a week. The timetable scheduler allocates daily deep blocks based on your remaining days & pace deficit.
+                7-day cumulative milestone targets. Track your weekly pacing and review completed outcomes at the end of each week.
               </p>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs font-mono text-luma-lime bg-[#212b10] px-3 py-1.5 rounded-full">
-                Current Week Active
+                Weekly Cadence Active
               </span>
               <button
                 type="button"
@@ -606,11 +606,21 @@ export const Tasks: React.FC<TasksProps> = ({
                 badgeStyle = { label: 'CREATIVE', color: 'bg-pink-500/10 text-pink-400 border-pink-500/30' };
               }
 
+              const isAchieved = wg.completed_units >= wg.target_units;
+              const now = new Date();
+              const currentDay = now.getDay();
+              const daysUntilSunday = currentDay === 0 ? 0 : 7 - currentDay;
+              const sundayReviewText = daysUntilSunday === 0 ? 'Sunday review today' : `Sunday review in ${daysUntilSunday}d`;
+
               return (
                 <div
                   key={wg.id}
                   onClick={() => onEditWeeklyGoal(wg)}
-                  className="bg-luma-card border border-luma-card-border hover:border-white/20 rounded-3xl p-6 transition-all cursor-pointer group"
+                  className={`bg-luma-card border rounded-3xl p-6 transition-all cursor-pointer group ${
+                    isAchieved
+                      ? 'border-emerald-500/30 hover:border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.08)]'
+                      : 'border-luma-card-border hover:border-white/20'
+                  }`}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div>
@@ -618,8 +628,19 @@ export const Tasks: React.FC<TasksProps> = ({
                         <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-md border tracking-wider uppercase ${badgeStyle.color}`}>
                           {badgeStyle.label}
                         </span>
+                        {isAchieved ? (
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 font-bold">
+                            <Trophy className="w-3 h-3 text-emerald-400" />
+                            <span>GOAL ACHIEVED</span>
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white/[0.04] text-luma-text-muted border border-white/10 flex items-center gap-1">
+                            <span>⏳</span>
+                            <span>IN PROGRESS</span>
+                          </span>
+                        )}
                         <span className="text-[10px] font-mono tracking-wider uppercase text-luma-text-dim">
-                          {wg.priority} PRIORITY · {wg.energy_level === 'deep_focus' ? 'DEEP WORK' : 'LIGHT'}
+                          {wg.priority} PRIORITY
                         </span>
                       </div>
                       <h4 className="text-base font-semibold text-white group-hover:text-luma-lime transition-colors">
@@ -710,11 +731,12 @@ export const Tasks: React.FC<TasksProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between text-xs font-mono text-luma-text-muted pt-1">
-                    <span>
+                    <span className={isAchieved ? 'text-emerald-400 font-semibold' : ''}>
                       {wg.completed_units} of {wg.target_units} {wg.unit_label} complete ({progress}%)
                     </span>
-                    <span className="text-white font-medium">
-                      Pacing: {wg.unitsPerDay || 1.0} / day
+                    <span className="text-luma-text-dim text-[11px] flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-luma-text-dim" />
+                      <span>{sundayReviewText}</span>
                     </span>
                   </div>
                 </div>

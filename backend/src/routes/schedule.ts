@@ -257,21 +257,10 @@ scheduleRouter.post('/generate', async (c) => {
       habits = habits.filter(h => answers.selected_habit_ids!.includes(h.id));
     }
 
-    // 3c. Fetch active weekly goals
-    const { results: weeklyGoalRows } = await c.env.DB.prepare(
-      'SELECT * FROM weekly_goals ORDER BY priority DESC'
-    ).all<any>();
-    let weeklyGoals = weeklyGoalRows || [];
-
-    // Filter by selected_weekly_goal_ids if provided
-    if (answers.selected_weekly_goal_ids && Array.isArray(answers.selected_weekly_goal_ids)) {
-      weeklyGoals = weeklyGoals.filter(wg => answers.selected_weekly_goal_ids!.includes(wg.id));
-    }
-
-    // 4. Generate merged schedule with Gemini (or smart fallback if key is not configured)
+    // 4. Generate merged schedule with Gemini (weekly goals are decoupled from daily timetable)
     const apiKey = c.env.GEMINI_API_KEY;
     const model = c.env.GEMINI_MODEL || 'gemini-1.5-flash';
-    const { blocks } = await generateScheduleWithGemini(tasks, goals, answers, habits, weeklyGoals, apiKey, model);
+    const { blocks } = await generateScheduleWithGemini(tasks, goals, answers, habits, [], apiKey, model);
 
     // 5. Save generated schedule strictly under targetDate
     const scheduleId = `sched-${targetDate}`;

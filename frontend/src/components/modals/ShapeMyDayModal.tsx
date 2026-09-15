@@ -178,7 +178,6 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
   // Section 3: Selections
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [selectedHabitIds, setSelectedHabitIds] = useState<string[]>([]);
-  const [selectedWeeklyGoalIds, setSelectedWeeklyGoalIds] = useState<string[]>([]);
   const [selectedLongTermGoalIds, setSelectedLongTermGoalIds] = useState<string[]>([]);
   const [goalConfigs, setGoalConfigs] = useState<Record<string, GoalDailyConfigState>>({});
   const [morningTodos, setMorningTodos] = useState<Array<{ title: string; duration_minutes: number }>>([]);
@@ -186,7 +185,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
   const [newTodoDuration, setNewTodoDuration] = useState(25);
 
   // Tab state for Section 3
-  const [activeTab, setActiveTab] = useState<'tasks' | 'habits' | 'weekly_goals' | 'long_term_goals' | 'todos'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'habits' | 'long_term_goals' | 'todos'>('tasks');
 
   // Auto-detect fixed commitments (tasks with scheduled_start)
   const detectedAnchors = useMemo(() => {
@@ -205,10 +204,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
       // 2. Active habits
       setSelectedHabitIds(habits.filter(h => h.is_active).map(h => h.id));
 
-      // 3. Active weekly goals
-      setSelectedWeeklyGoalIds(weeklyGoals.map(wg => wg.id));
-
-      // 3b. Active long-term goals / learning paths
+      // 3. Active long-term goals / learning paths
       setSelectedLongTermGoalIds(goals.map(g => g.id));
       const initialConfigs: Record<string, GoalDailyConfigState> = {};
       for (const g of goals) {
@@ -304,14 +300,6 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
     setSelectedHabitIds(select ? habits.filter(h => h.is_active).map(h => h.id) : []);
   };
 
-  const toggleWeeklyGoal = (id: string) => {
-    setSelectedWeeklyGoalIds(prev => prev.includes(id) ? prev.filter(gId => gId !== id) : [...prev, id]);
-  };
-
-  const toggleAllWeeklyGoals = (select: boolean) => {
-    setSelectedWeeklyGoalIds(select ? weeklyGoals.map(g => g.id) : []);
-  };
-
   const toggleLongTermGoal = (id: string) => {
     setSelectedLongTermGoalIds(prev => prev.includes(id) ? prev.filter(gId => gId !== id) : [...prev, id]);
   };
@@ -349,8 +337,6 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
     for (const h of selHabits) {
       mins += h.duration_minutes > 0 ? h.duration_minutes : 10;
     }
-    // Selected weekly goals (estimate 75m pacing block per selected goal)
-    mins += selectedWeeklyGoalIds.length * 75;
     // Selected long-term goals (uses custom duration per goal)
     for (const gId of selectedLongTermGoalIds) {
       const cfg = goalConfigs[gId];
@@ -361,7 +347,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
       mins += td.duration_minutes || 20;
     }
     return mins;
-  }, [tasks, selectedTaskIds, habits, selectedHabitIds, selectedWeeklyGoalIds, selectedLongTermGoalIds, goalConfigs, morningTodos]);
+  }, [tasks, selectedTaskIds, habits, selectedHabitIds, selectedLongTermGoalIds, goalConfigs, morningTodos]);
 
   const plannedHours = (totalPlannedMinutes / 60).toFixed(1);
   const capacityPercent = Math.min(Math.round((totalPlannedMinutes / netFocusMinutes) * 100), 160);
@@ -412,7 +398,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
         focus_preference: preference.trim() || undefined,
         selected_task_ids: selectedTaskIds,
         selected_habit_ids: selectedHabitIds,
-        selected_weekly_goal_ids: selectedWeeklyGoalIds,
+        selected_weekly_goal_ids: [],
         selected_long_term_goal_ids: selectedLongTermGoalIds,
         long_term_goal_configs: longTermConfigsPayload,
         morning_todos: morningTodos,
@@ -867,21 +853,6 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setActiveTab('weekly_goals')}
-                    className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
-                      activeTab === 'weekly_goals'
-                        ? 'bg-luma-card-border text-white font-semibold shadow-sm'
-                        : 'text-luma-text-dim hover:text-white'
-                    }`}
-                  >
-                    <span>Weekly</span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10">
-                      {selectedWeeklyGoalIds.length}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
                     onClick={() => setActiveTab('long_term_goals')}
                     className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
                       activeTab === 'long_term_goals'
@@ -1164,77 +1135,6 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                               </div>
                             </div>
                           </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* TAB CONTENT: WEEKLY GOALS */}
-              {activeTab === 'weekly_goals' && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-[11px] text-luma-text-dim">
-                    <span>Weekly goals to allocate prime deep focus blocks for today:</span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleAllWeeklyGoals(true)}
-                        className="text-luma-lime hover:underline font-mono"
-                      >
-                        Select All
-                      </button>
-                      <span>•</span>
-                      <button
-                        type="button"
-                        onClick={() => toggleAllWeeklyGoals(false)}
-                        className="hover:text-white font-mono"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
-
-                  {weeklyGoals.length === 0 ? (
-                    <div className="p-6 text-center text-xs text-luma-text-dim bg-[#141514] rounded-xl border border-white/[0.04]">
-                      No active weekly targets found. Add targets in the Tasks board!
-                    </div>
-                  ) : (
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                      {weeklyGoals.map((wg) => {
-                        const isChecked = selectedWeeklyGoalIds.includes(wg.id);
-                        return (
-                          <div
-                            key={wg.id}
-                            onClick={() => toggleWeeklyGoal(wg.id)}
-                            className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all text-xs ${
-                              isChecked
-                                ? 'bg-[#1b2520] border-luma-lime/40 text-white'
-                                : 'bg-[#141514] border-white/[0.04] text-luma-text-dim opacity-60'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
-                                isChecked ? 'bg-luma-lime border-luma-lime text-black' : 'border-luma-text-dim'
-                              }`}>
-                                {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                              </div>
-                              <div>
-                                <span className="font-medium text-white block truncate">{wg.title}</span>
-                                <span className="text-[10px] font-mono text-luma-text-dim">
-                                  Pacing: {wg.unitsPerDay || 1.0} {wg.unit_label}/day
-                                </span>
-                              </div>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <span className="font-mono text-xs text-luma-lime block">
-                                {wg.completed_units}/{wg.target_units} {wg.unit_label}
-                              </span>
-                              <span className="text-[10px] font-mono text-luma-text-dim">
-                                ~75m deep focus block
-                              </span>
-                            </div>
-                          </div>
                         );
                       })}
                     </div>
@@ -1649,7 +1549,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
 
             <div className="flex items-center gap-3">
               <span className="text-[11px] font-mono text-luma-text-dim hidden sm:inline">
-                {selectedTaskIds.length} tasks • {selectedHabitIds.length} habits • {selectedWeeklyGoalIds.length} goals
+                {selectedTaskIds.length} tasks • {selectedHabitIds.length} habits • {selectedLongTermGoalIds.length} roadmaps
               </span>
 
               <button
