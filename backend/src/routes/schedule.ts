@@ -117,6 +117,86 @@ scheduleRouter.get('/today', async (c) => {
   }
 });
 
+// GET /api/schedule/week?startDate=YYYY-MM-DD
+scheduleRouter.get('/week', async (c) => {
+  try {
+    const todayIST = getTodayIST();
+    const queryStart = c.req.query('startDate');
+
+    // Determine Monday of the target week in IST
+    let mondayDate: Date;
+    if (queryStart && queryStart.trim() !== '') {
+      mondayDate = new Date(`${queryStart}T00:00:00Z`);
+    } else {
+      const nowUtc = new Date();
+      const nowIst = new Date(nowUtc.getTime() + (nowUtc.getTimezoneOffset() * 60000) + (3600000 * 5.5));
+      const dayOfWeek = nowIst.getDay();
+      const distToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      mondayDate = new Date(nowIst);
+      mondayDate.setDate(nowIst.getDate() + distToMonday);
+    }
+
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const dayCodes = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
+    const weekDates: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(mondayDate);
+      d.setDate(mondayDate.getDate() + i);
+      weekDates.push(d.toISOString().split('T')[0]);
+    }
+
+    const placeholders = weekDates.map(() => '?').join(',');
+    const { results } = await c.env.DB.prepare(
+      `SELECT date, generated_plan FROM schedules WHERE date IN (${placeholders})`
+    ).bind(...weekDates).all<any>();
+
+    const scheduleMap = new Map<string, any[]>();
+    for (const row of (results || [])) {
+      try {
+        scheduleMap.set(row.date, JSON.parse(row.generated_plan || '[]'));
+      } catch {}
+    }
+
+    let totalWeekFocusMinutes = 0;
+    const days = weekDates.map((dateStr, idx) => {
+      const rawBlocks = scheduleMap.get(dateStr) || [];
+      const blocks: ScheduleBlock[] = Array.isArray(rawBlocks) ? rawBlocks : [];
+      const nonBreak = blocks.filter(b => b.type !== 'break');
+      const focusMinutes = blocks
+        .filter(b => b.type === 'deep_focus')
+        .reduce((acc, b) => acc + (b.duration || 0), 0);
+      const doneBlocks = nonBreak.filter(b => b.status === 'done').length;
+
+      totalWeekFocusMinutes += focusMinutes;
+
+      return {
+        date: dateStr,
+        dayName: dayNames[idx],
+        dayCode: dayCodes[idx],
+        isToday: dateStr === todayIST,
+        isShaped: nonBreak.length > 0,
+        blocks,
+        totalFocusMinutes: focusMinutes,
+        focusHours: Math.round((focusMinutes / 60) * 10) / 10,
+        completedBlocks: doneBlocks,
+        totalBlocks: nonBreak.length,
+      };
+    });
+
+    return c.json({
+      success: true,
+      weekStart: weekDates[0],
+      weekEnd: weekDates[6],
+      totalWeekFocusMinutes,
+      totalWeekFocusHours: Math.round((totalWeekFocusMinutes / 60) * 10) / 10,
+      days
+    });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
+
 // GET /api/schedule/active-dates
 scheduleRouter.get('/active-dates', async (c) => {
   try {

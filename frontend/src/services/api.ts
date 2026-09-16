@@ -111,6 +111,19 @@ export interface ScheduleBlock {
   is_untimed?: boolean;
 }
 
+export interface WeekDaySchedule {
+  date: string;
+  dayName: string;
+  dayCode: string;
+  isToday: boolean;
+  isShaped: boolean;
+  blocks: ScheduleBlock[];
+  totalFocusMinutes: number;
+  focusHours: number;
+  completedBlocks: number;
+  totalBlocks: number;
+}
+
 export interface QuestionnaireAnswers {
   available_hours: number;
   wake_time: string;
@@ -311,6 +324,16 @@ export const api = {
 
   getActiveScheduleDates: () =>
     request<{ success: boolean; dates: string[] }>('/api/schedule/active-dates'),
+
+  getWeeklySchedule: (startDate?: string) =>
+    request<{
+      success: boolean;
+      weekStart: string;
+      weekEnd: string;
+      totalWeekFocusMinutes: number;
+      totalWeekFocusHours: number;
+      days: WeekDaySchedule[];
+    }>(`/api/schedule/week${startDate ? `?startDate=${encodeURIComponent(startDate)}` : ''}`),
 
   submitQuestionnaire: (answers: QuestionnaireAnswers) =>
     request<{ success: boolean; id: string; date: string }>('/api/schedule/questionnaire', {

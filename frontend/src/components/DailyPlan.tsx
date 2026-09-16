@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CheckCircle2, Circle, Play, Sparkles, Calendar, Briefcase, History } from 'lucide-react';
-import { api, Habit, ScheduleBlock, isTimeWithinBlock } from '../services/api';
+import { CheckCircle2, Circle, Play, Sparkles, Calendar, Briefcase, History, Compass } from 'lucide-react';
+import { api, Habit, ScheduleBlock, isTimeWithinBlock, Goal, StatsResponse } from '../services/api';
+import { getCategoryBadge } from './LearningPaths';
 import { DailyAnchorsCard } from './DailyAnchorsCard';
 
 type DayCode = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
@@ -61,21 +62,31 @@ export const computeCurrentWeekDays = (activeDates: string[] = []): WeekDayItem[
 interface DailyPlanProps {
   schedule: ScheduleBlock[];
   habits?: Habit[];
+  goals?: Goal[];
+  stats?: StatsResponse | null;
   onToggleStatus: (id: string, dateStr?: string) => void;
   onToggleHabit?: (habitId: string) => void | Promise<void>;
   onStartFocus: (taskTitle: string, durationMinutes: number, blockId?: string) => void;
   onAdjustCapacity: () => void;
   onOpenShapeMyDay?: (targetDate?: string) => void;
+  onSelectGoal?: (goalId: string) => void;
+  onSelectTab?: (tab: any) => void;
+  initialDateStr?: string;
 }
 
 export const DailyPlan: React.FC<DailyPlanProps> = ({
   schedule,
   habits = [],
+  goals = [],
+  stats = null,
   onToggleStatus,
   onToggleHabit,
   onStartFocus,
   onAdjustCapacity,
   onOpenShapeMyDay,
+  onSelectGoal,
+  onSelectTab,
+  initialDateStr,
 }) => {
   const savedWorkHours = useMemo(() => {
     try {
@@ -92,7 +103,14 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
   }, []);
 
   // Date selection state
-  const [selectedDateStr, setSelectedDateStr] = useState<string>(todayDateStr);
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(() => initialDateStr || todayDateStr);
+
+  useEffect(() => {
+    if (initialDateStr) {
+      setSelectedDateStr(initialDateStr);
+    }
+  }, [initialDateStr]);
+
   const [scheduleMap, setScheduleMap] = useState<Record<string, ScheduleBlock[]>>({});
   const [activeDates, setActiveDates] = useState<string[]>([]);
   const [loadingDay, setLoadingDay] = useState(false);
@@ -480,7 +498,101 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
           {/* Card 1: Daily Anchors & Lifestyle Targets */}
           <DailyAnchorsCard habits={habits} onToggleHabit={onToggleHabit || (async () => {})} />
 
-          {/* Card 2: Next Protected Block Spotlight */}
+          {/* Card 2: Long view */}
+          <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-base font-semibold text-white tracking-tight">
+                Long view
+              </h2>
+              <span className="text-[11px] font-mono tracking-wider uppercase text-luma-text-muted bg-[#212421] px-2.5 py-1 rounded-full border border-white/5">
+                {goals.length} ACTIVE
+              </span>
+            </div>
+
+            {/* Goal List */}
+            {goals.length > 0 ? (
+              <div className="space-y-4">
+                {goals.map((goal, idx) => {
+                  const progress = Math.min(100, Math.round((goal.covered_units / Math.max(goal.total_units, 1)) * 100));
+
+                  const barColors = [
+                    'bg-luma-purple shadow-[0_0_12px_rgba(123,110,246,0.5)]',
+                    'bg-luma-lime shadow-[0_0_12px_rgba(212,249,56,0.4)]',
+                    'bg-[#f08a5d] shadow-[0_0_12px_rgba(240,138,93,0.4)]',
+                  ];
+                  const barColor = barColors[idx % barColors.length];
+
+                  const target = new Date(goal.target_date).getTime();
+                  const now = new Date().getTime();
+                  const daysLeft = Math.max(0, Math.ceil((target - now) / (1000 * 60 * 60 * 24)));
+
+                  return (
+                    <div
+                      key={goal.id}
+                      onClick={() => {
+                        if (onSelectGoal) onSelectGoal(goal.id);
+                        if (onSelectTab) onSelectTab('learning');
+                      }}
+                      className="p-3 rounded-2xl hover:bg-white/[0.04] border border-transparent hover:border-white/10 cursor-pointer transition-all group"
+                      title="Click to view detailed roadmap in Projects & Goals"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-white group-hover:text-luma-lime transition-colors">
+                            {goal.title} →
+                          </span>
+                          {goal.category && (
+                            <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full border ${getCategoryBadge(goal.category).color}`}>
+                              {getCategoryBadge(goal.category).label}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs font-mono font-medium text-[#f08a5d]">
+                          {daysLeft} days
+                        </span>
+                      </div>
+
+                      {/* Bar */}
+                      <div className="w-full h-1.5 bg-[#252825] rounded-full overflow-hidden mb-2">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+
+                      {/* Units & Percent */}
+                      <div className="flex items-center justify-between text-xs font-mono text-luma-text-muted">
+                        <span>
+                          {goal.covered_units} / {goal.total_units} {goal.unit_label}
+                        </span>
+                        <span>{progress}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-8 px-4 text-center space-y-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#212421] flex items-center justify-center mx-auto text-luma-text-muted border border-white/5">
+                  <Compass className="w-5 h-5 stroke-[1.5]" />
+                </div>
+                <h3 className="text-sm font-semibold text-white">No active projects or goals</h3>
+                <p className="text-xs text-luma-text-muted max-w-xs mx-auto leading-relaxed">
+                  Configure projects, business initiatives, or exam runways in Projects & Goals.
+                </p>
+                {onSelectTab && (
+                  <button
+                    onClick={() => onSelectTab('learning')}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-xs font-medium text-white border border-white/10 transition-all"
+                  >
+                    <span>Open Projects & Goals →</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Card 3: Next Protected Block Spotlight */}
           <div className="relative overflow-hidden bg-gradient-to-br from-[#f5f1e8] to-[#e8e2d5] text-luma-cream-text rounded-3xl p-7 shadow-md">
             {/* Soft decorative background purple blob */}
             <div className="absolute -bottom-10 -right-10 w-44 h-44 rounded-full bg-[#9f8ff5]/40 blur-2xl pointer-events-none" />
@@ -574,6 +686,49 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
               )}
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Bottom Card: Consistency is becoming a pattern -> navigates to Patterns */}
+      <div
+        onClick={() => {
+          if (onSelectTab) onSelectTab('patterns');
+        }}
+        className="bg-luma-card border border-luma-card-border hover:border-white/20 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 cursor-pointer transition-all group shadow-md"
+        title="Click to open Patterns & Analytics"
+      >
+        <div className="max-w-xl">
+          <h3 className="text-base font-semibold text-white tracking-tight mb-1 group-hover:text-luma-purple transition-colors">
+            Consistency is becoming a pattern →
+          </h3>
+          <p className="text-sm text-luma-text-muted leading-relaxed">
+            <span className="text-white font-medium">{stats?.weeklyRhythm?.rate || 0}% completion</span> across the past week. Your protected focus blocks are holding especially well.
+          </p>
+        </div>
+
+        {/* Mini 7-Day Bar Chart */}
+        <div className="flex items-end gap-3.5 pt-2">
+          {(stats?.weeklyPatternDays || [
+            { day: 'M', heightPercent: 0 },
+            { day: 'T', heightPercent: 0 },
+            { day: 'W', heightPercent: 0 },
+            { day: 'T', heightPercent: 0 },
+            { day: 'F', heightPercent: 0 },
+            { day: 'S', heightPercent: 0 },
+            { day: 'S', heightPercent: 0 },
+          ]).map((bar, i) => (
+            <div key={i} className="flex flex-col items-center gap-2">
+              <div className="w-4 h-16 bg-[#212421] rounded-t-sm flex items-end overflow-hidden">
+                <div
+                  className="w-full bg-luma-purple rounded-t-sm shadow-[0_0_8px_rgba(123,110,246,0.3)] transition-all duration-500 hover:brightness-125"
+                  style={{ height: `${bar.heightPercent}%` }}
+                />
+              </div>
+              <span className="text-[10px] font-mono text-luma-text-dim uppercase">
+                {bar.day}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

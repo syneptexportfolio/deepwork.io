@@ -29,6 +29,7 @@ export const App: React.FC = () => {
   // Modals & Flows
   const [isShapeMyDayOpen, setIsShapeMyDayOpen] = useState(false);
   const [shapeTargetDate, setShapeTargetDate] = useState<string | undefined>(undefined);
+  const [selectedDailyPlanDate, setSelectedDailyPlanDate] = useState<string | undefined>(undefined);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -385,15 +386,27 @@ export const App: React.FC = () => {
           schedule={schedule}
           habits={habits}
           goals={goals}
+          weeklyGoals={weeklyGoals}
+          tasks={tasks}
           stats={stats}
           onSelectTab={setCurrentTab}
           onSelectGoal={(goalId) => {
             setSelectedGoalId(goalId);
             setCurrentTab('learning');
           }}
+          onSelectDay={(dateStr) => {
+            setSelectedDailyPlanDate(dateStr);
+            setCurrentTab('daily');
+          }}
           onToggleScheduleStatus={handleToggleScheduleStatus}
           onToggleHabit={handleCheckHabitStreak}
-          onOpenShapeMyDay={() => setIsShapeMyDayOpen(true)}
+          onOpenShapeMyDay={(targetDate) => {
+            setShapeTargetDate(targetDate);
+            setIsShapeMyDayOpen(true);
+          }}
+          onAddTask={() => { setEditingTask(null); setIsTaskModalOpen(true); }}
+          onAddWeeklyGoal={() => { setEditingWeeklyGoal(null); setIsWeeklyGoalModalOpen(true); }}
+          onIncrementWeeklyGoal={handleIncrementWeeklyGoal}
         />
       )}
 
@@ -401,6 +414,9 @@ export const App: React.FC = () => {
         <DailyPlan
           schedule={schedule}
           habits={habits}
+          goals={goals}
+          stats={stats}
+          initialDateStr={selectedDailyPlanDate}
           onToggleStatus={handleToggleScheduleStatus}
           onToggleHabit={handleCheckHabitStreak}
           onStartFocus={(taskTitle, durationMinutes, blockId) =>
@@ -415,6 +431,11 @@ export const App: React.FC = () => {
             setShapeTargetDate(targetDate);
             setIsShapeMyDayOpen(true);
           }}
+          onSelectGoal={(goalId) => {
+            setSelectedGoalId(goalId);
+            setCurrentTab('learning');
+          }}
+          onSelectTab={setCurrentTab}
         />
       )}
 
