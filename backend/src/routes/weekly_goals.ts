@@ -77,57 +77,14 @@ weeklyGoalsRouter.patch('/:id', async (c) => {
 
     const title = body.title !== undefined ? body.title : current.title;
     const target_units = body.target_units !== undefined ? body.target_units : current.target_units;
-    const completed_units = body.completed_units !== undefined ? body.completed_units : current.completed_units;
+    const completed_units = body.completed_units !== undefined
+      ? Math.max(0, Math.min(target_units, body.completed_units))
+      : current.completed_units;
     const unit_label = body.unit_label !== undefined ? body.unit_label : current.unit_label;
     const priority = body.priority !== undefined ? body.priority : current.priority;
     const energy_level = body.energy_level !== undefined ? body.energy_level : current.energy_level;
     const goal_id = body.goal_id !== undefined ? body.goal_id : current.goal_id;
     const category = body.category !== undefined ? body.category : (current.category || 'Project');
-
-    // Sync linked long-term goal if goal_id is linked and completed_units changed
-    const effectiveGoalId = goal_id !== undefined ? goal_id : current.goal_id;
-    if (effectiveGoalId && completed_units !== undefined && completed_units !== current.completed_units) {
-      try {
-        const targetGoalRaw = await c.env.DB.prepare('SELECT * FROM goals WHERE id = ?').bind(effectiveGoalId).first<any>();
-        if (targetGoalRaw) {
-          let syllabus = typeof targetGoalRaw.syllabus === 'string' ? JSON.parse(targetGoalRaw.syllabus) : targetGoalRaw.syllabus || [];
-          const diff = completed_units - current.completed_units;
-          
-          if (diff > 0) {
-            let newlyCovered = 0;
-            for (const topic of syllabus) {
-              if (!topic.covered && newlyCovered < diff) {
-                topic.covered = true;
-                topic.status = 'COVERED';
-                newlyCovered++;
-              }
-            }
-          } else if (diff < 0) {
-            let newlyUncovered = 0;
-            const toUncover = Math.abs(diff);
-            for (let i = syllabus.length - 1; i >= 0; i--) {
-              if (syllabus[i].covered && newlyUncovered < toUncover) {
-                syllabus[i].covered = false;
-                syllabus[i].status = 'NEXT UP';
-                newlyUncovered++;
-              }
-            }
-          }
-
-          const coveredCount = syllabus.filter((t: any) => t.covered).length;
-          const totalUnits = Math.max(targetGoalRaw.total_units || 0, syllabus.length, 1);
-          const newCoveredUnits = syllabus.length > 0
-            ? (syllabus.length === totalUnits ? coveredCount : Math.round((coveredCount / syllabus.length) * totalUnits))
-            : Math.max(0, Math.min(totalUnits, (targetGoalRaw.covered_units || 0) + diff));
-
-          await c.env.DB.prepare(
-            'UPDATE goals SET syllabus = ?, covered_units = ? WHERE id = ?'
-          ).bind(JSON.stringify(syllabus), newCoveredUnits, effectiveGoalId).run();
-        }
-      } catch (syncErr) {
-        console.error('Failed to sync linked long-term goal from weekly goal:', syncErr);
-      }
-    }
 
     await c.env.DB.prepare(
       `UPDATE weekly_goals SET title = ?, target_units = ?, completed_units = ?, unit_label = ?, priority = ?, energy_level = ?, goal_id = ?, category = ? WHERE id = ?`

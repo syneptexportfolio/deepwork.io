@@ -655,16 +655,22 @@ export const Tasks: React.FC<TasksProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onIncrementWeeklyGoal(wg.id, wg.completed_units);
-                        }}
-                        className="text-xs font-mono bg-luma-lime/10 hover:bg-luma-lime hover:text-black text-luma-lime px-3 py-1.5 rounded-xl transition-all font-medium"
-                      >
-                        +1 {wg.unit_label}
-                      </button>
+                      {isAchieved ? (
+                        <span className="text-xs font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-xl font-medium select-none">
+                          ✓ Done
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onIncrementWeeklyGoal(wg.id, wg.completed_units);
+                          }}
+                          className="text-xs font-mono bg-luma-lime/10 hover:bg-luma-lime hover:text-black text-luma-lime px-3 py-1.5 rounded-xl transition-all font-medium cursor-pointer active:scale-95"
+                        >
+                          +1 {wg.unit_label}
+                        </button>
+                      )}
 
                       <button
                         type="button"

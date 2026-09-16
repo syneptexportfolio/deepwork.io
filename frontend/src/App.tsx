@@ -215,17 +215,16 @@ export const App: React.FC = () => {
   };
 
   const handleIncrementWeeklyGoal = async (id: string, currentCompleted: number) => {
+    const targetGoal = weeklyGoals.find(wg => wg.id === id);
+    if (targetGoal && currentCompleted >= targetGoal.target_units) {
+      return; // Already reached max target units
+    }
+    const nextCompleted = targetGoal ? Math.min(targetGoal.target_units, currentCompleted + 1) : currentCompleted + 1;
     confetti({ particleCount: 50, spread: 50, origin: { y: 0.6 } });
     try {
-      const res = await api.updateWeeklyGoal(id, { completed_units: currentCompleted + 1 });
+      const res = await api.updateWeeklyGoal(id, { completed_units: nextCompleted });
       if (res.weeklyGoal) {
         setWeeklyGoals(prev => prev.map(wg => wg.id === id ? res.weeklyGoal : wg));
-        if (res.weeklyGoal.goal_id) {
-          try {
-            const goalsRes = await api.getGoals();
-            if (goalsRes.goals) setGoals(goalsRes.goals);
-          } catch {}
-        }
       }
     } catch (err) {
       console.error('Failed to update weekly goal progress:', err);

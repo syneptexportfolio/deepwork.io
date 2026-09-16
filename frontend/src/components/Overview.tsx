@@ -239,8 +239,9 @@ export const Overview: React.FC<OverviewProps> = ({
     };
   }, [selectedMonthOffset, activeHabits, completedHabitsToday, avgStreak]);
 
-  const handleQuickIncrement = async (e: React.MouseEvent, id: string, completed: number) => {
+  const handleQuickIncrement = async (e: React.MouseEvent, id: string, completed: number, target: number) => {
     e.stopPropagation();
+    if (completed >= target) return;
     confetti({ particleCount: 40, spread: 45, origin: { y: 0.6 } });
     if (onIncrementWeeklyGoal) {
       await onIncrementWeeklyGoal(id, completed);
@@ -961,15 +962,21 @@ export const Overview: React.FC<OverviewProps> = ({
                         </div>
 
                         {/* Quick increment button */}
-                        <button
-                          type="button"
-                          onClick={(e) => handleQuickIncrement(e, wg.id, wg.completed_units)}
-                          className="px-2 py-1 rounded-lg text-[10px] font-mono bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 transition-all cursor-pointer active:scale-95"
-                          title="Increment +1 unit"
-                        >
-                          <Plus className="w-2.5 h-2.5" />
-                          <span>+1</span>
-                        </button>
+                        {isDone ? (
+                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 select-none font-semibold">
+                            <span>✓ Completed</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => handleQuickIncrement(e, wg.id, wg.completed_units, wg.target_units)}
+                            className="px-2 py-1 rounded-lg text-[10px] font-mono bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+                            title="Increment +1 unit"
+                          >
+                            <Plus className="w-2.5 h-2.5" />
+                            <span>+1</span>
+                          </button>
+                        )}
                       </div>
 
                       {/* Progress Bar */}
