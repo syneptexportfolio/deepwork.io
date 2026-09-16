@@ -48,8 +48,8 @@ export const Overview: React.FC<OverviewProps> = ({
   habits = [],
   goals = [],
   weeklyGoals = [],
-  tasks = [],
-  stats,
+  tasks: _tasks = [],
+  stats: _stats,
   onSelectTab,
   onSelectGoal,
   onSelectDay,
@@ -130,6 +130,8 @@ export const Overview: React.FC<OverviewProps> = ({
   // Today metrics
   const activeBlocks = schedule.filter((s) => s.type !== 'break');
   const doneBlocks = activeBlocks.filter((s) => s.status === 'done');
+  const isTodayShaped = activeBlocks.length > 0;
+
   const nextPendingBlock =
     activeBlocks.find((s) => s.status === 'pending' && s.end_time >= currentHHMM) ||
     activeBlocks.find((s) => s.status === 'pending');
@@ -139,24 +141,17 @@ export const Overview: React.FC<OverviewProps> = ({
     .reduce((sum, s) => sum + s.duration, 0);
   const todayFocusHrs = Math.floor(todayFocusMinutes / 60);
   const todayFocusMins = todayFocusMinutes % 60;
-  const protectedFocusFormatted =
-    todayFocusMinutes > 0
-      ? `${todayFocusHrs}h ${todayFocusMins}m`
-      : stats?.protectedFocus.totalMinutes
-      ? stats.protectedFocus.formatted
-      : '0h 0m';
+  const protectedFocusFormatted = isTodayShaped
+    ? `${todayFocusHrs}h ${todayFocusMins}m`
+    : '0h 0m';
 
-  const promisesFormatted =
-    activeBlocks.length > 0
-      ? `${doneBlocks.length}/${activeBlocks.length}`
-      : stats?.promisesKept.total
-      ? stats.promisesKept.formatted
-      : '0/0';
+  const promisesFormatted = isTodayShaped
+    ? `${doneBlocks.length}/${activeBlocks.length}`
+    : '0/0';
 
-  const rhythmRate =
-    activeBlocks.length > 0
-      ? Math.round((doneBlocks.length / activeBlocks.length) * 100)
-      : stats?.weeklyRhythm.rate || 0;
+  const rhythmRate = isTodayShaped
+    ? Math.round((doneBlocks.length / activeBlocks.length) * 100)
+    : 0;
 
   // Active habits metrics
   const activeHabits = useMemo(() => habits.filter((h) => h.is_active), [habits]);
@@ -336,8 +331,12 @@ export const Overview: React.FC<OverviewProps> = ({
           </div>
           <div className="flex items-center justify-between text-xs font-mono text-luma-text-muted mt-3">
             <span>Today's deep work</span>
-            <span className="text-luma-lime">
-              {nextPendingBlock ? `Next ${nextPendingBlock.start_time}` : 'All complete'}
+            <span className={isTodayShaped ? 'text-luma-lime font-medium' : 'text-amber-400/90 font-medium'}>
+              {isTodayShaped
+                ? nextPendingBlock
+                  ? `Next ${nextPendingBlock.start_time}`
+                  : 'All complete'
+                : 'Unshaped'}
             </span>
           </div>
         </div>
@@ -360,8 +359,8 @@ export const Overview: React.FC<OverviewProps> = ({
           </div>
           <div className="flex items-center justify-between text-xs font-mono text-luma-text-muted mt-3">
             <span>{rhythmRate}% rhythm score</span>
-            <span className="text-luma-purple">
-              {doneBlocks.length} done {tasks.length > 0 ? `(${tasks.filter(t => t.status === 'done').length}/${tasks.length} tasks)` : ''}
+            <span className={isTodayShaped ? 'text-luma-purple font-medium' : 'text-luma-text-dim'}>
+              {isTodayShaped ? `${doneBlocks.length} completed` : 'No blocks yet'}
             </span>
           </div>
         </div>

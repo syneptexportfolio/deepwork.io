@@ -16,18 +16,18 @@ statsRouter.get('/', async (c) => {
     ).all<any>();
     const scheduleRows = allSchedules || [];
 
-    // Prioritize today's schedule in IST, otherwise latest schedule
+    // Strictly use today's schedule in IST
     const todayStr = getTodayIST();
-    const activeSched = scheduleRows.find(s => s.date === todayStr) || (scheduleRows.length > 0 ? scheduleRows[scheduleRows.length - 1] : null);
+    const todaySched = scheduleRows.find(s => s.date === todayStr) || null;
 
     let focusMinutes = 0;
     let doneCount = 0;
     let totalCount = 0;
-    let nextSession = '10:30';
+    let nextSession = 'Unshaped';
 
-    if (activeSched && activeSched.generated_plan) {
+    if (todaySched && todaySched.generated_plan) {
       try {
-        const blocks: any[] = JSON.parse(activeSched.generated_plan);
+        const blocks: any[] = JSON.parse(todaySched.generated_plan);
         const activeBlocks = blocks.filter(b => b.type !== 'break');
         const doneBlocks = activeBlocks.filter(b => b.status === 'done');
         const nextPending = activeBlocks.find(b => b.status === 'pending');
@@ -46,16 +46,6 @@ statsRouter.get('/', async (c) => {
       } catch (e) {
         console.error('Failed to parse schedule plan in stats:', e);
       }
-    }
-
-    // If no schedule blocks found, check tasks table
-    if (totalCount === 0) {
-      doneCount = allTasks.filter(t => t.status === 'done').length;
-      const pendingCount = allTasks.filter(t => t.status === 'pending').length;
-      totalCount = doneCount + pendingCount;
-      focusMinutes = allTasks
-        .filter(t => t.energy_level === 'deep_focus')
-        .reduce((sum, t) => sum + (t.duration_minutes || 0), 0);
     }
 
     const hasAnyContent = allTasks.length > 0 || totalCount > 0 || scheduleRows.length > 0;
