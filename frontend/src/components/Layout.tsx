@@ -116,7 +116,7 @@ export const Layout: React.FC<LayoutProps> = ({
       {/* Main Content Area */}
       <div className="flex-1 ml-64 flex flex-col min-h-screen">
         {/* Top Floating App Bar */}
-        <header className="px-10 pt-8 pb-4 flex items-center justify-between">
+        <header className="px-10 pt-5 pb-3 flex items-center justify-between">
           <div className="flex flex-col gap-0.5">
             <div className="text-[11px] font-mono tracking-widest uppercase text-luma-text-muted flex items-center gap-2">
               <span className="text-white font-semibold">{dayName}</span>

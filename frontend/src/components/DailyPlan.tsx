@@ -27,7 +27,7 @@ export interface WeekDayItem {
 }
 
 // Compute dynamic current week starting from Monday
-export const computeCurrentWeekDays = (activeDates: string[] = []): WeekDayItem[] => {
+export const computeCurrentWeekDays = (_activeDates: string[] = []): WeekDayItem[] => {
   const now = new Date();
   const dayIdx = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
   const distToMonday = dayIdx === 0 ? -6 : 1 - dayIdx;
@@ -46,7 +46,7 @@ export const computeCurrentWeekDays = (activeDates: string[] = []): WeekDayItem[
     const dateStr = `${year}-${month}-${day}`;
 
     const isToday = d.toDateString() === now.toDateString();
-    const hasDot = activeDates.includes(dateStr);
+    const hasDot = isToday;
 
     return {
       day: code,
@@ -246,20 +246,21 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
           </p>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons: Only show Reshape button when day is already shaped; unshaped days use the empty state CTA */}
         <div className="flex items-center gap-3">
           {isPastDate ? (
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/[0.03] border border-white/10 text-luma-text-dim text-xs font-mono select-none">
               <History className="w-3.5 h-3.5" />
               <span>Past date • Archive</span>
             </div>
-          ) : onOpenShapeMyDay ? (
+          ) : activeDaySchedule.length > 0 && onOpenShapeMyDay ? (
             <button
               onClick={() => onOpenShapeMyDay(selectedDateStr)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-luma-lime hover:bg-luma-lime-hover text-black text-xs font-semibold shadow-lime-glow active:scale-95 transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-xs font-semibold border border-white/10 active:scale-95 transition-all shadow-sm"
+              title="Reshape this day's timetable with AI"
             >
-              <Sparkles className="w-3.5 h-3.5 stroke-[2.2]" />
-              <span>{isSelectedToday ? 'Shape my day' : `Shape ${selectedDayItem.day}`}</span>
+              <Sparkles className="w-3.5 h-3.5 text-luma-lime stroke-[2.2]" />
+              <span>{isSelectedToday ? 'Reshape day' : `Reshape ${selectedDayItem.day}`}</span>
             </button>
           ) : null}
         </div>
@@ -284,8 +285,14 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
               </span>
               <div className="flex items-center gap-1 font-mono text-sm font-semibold">
                 <span>{item.date}</span>
-                {item.hasDot && !isSelected && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-luma-lime shadow-[0_0_6px_#d4f938]"></span>
+                {item.isToday && (
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      isSelected
+                        ? 'bg-[#151715] shadow-none'
+                        : 'bg-luma-lime shadow-[0_0_6px_#d4f938] animate-pulse'
+                    }`}
+                  />
                 )}
               </div>
             </button>
@@ -615,13 +622,13 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                       : `No focus blocks scheduled for ${fullDayNames[selectedDayCode]}. Shape this day in advance with AI.`}
                   </p>
 
-                  {onOpenShapeMyDay && (
+                  {activeDaySchedule.length > 0 && onOpenShapeMyDay && (
                     <button
                       onClick={() => onOpenShapeMyDay(selectedDateStr)}
                       className="inline-flex items-center gap-2 bg-[#121312] text-white px-5 py-3 rounded-2xl text-xs font-semibold shadow-md hover:bg-black transition-all"
                     >
                       <Sparkles className="w-4 h-4 text-luma-lime" />
-                      <span>Shape {isSelectedToday ? 'today' : fullDayNames[selectedDayCode]} with AI</span>
+                      <span>Reshape timetable</span>
                     </button>
                   )}
                 </>
