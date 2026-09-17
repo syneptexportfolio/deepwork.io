@@ -162,12 +162,12 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
   // Section 1: Rhythm, Working Hours & Energy
   const [wakeTime, setWakeTime] = useState('07:30');
   const [sleepTime, setSleepTime] = useState('23:30');
-  const [workStartTime, setWorkStartTime] = useState('09:30');
-  const [workEndTime, setWorkEndTime] = useState('18:30');
+  const [workStartTime, setWorkStartTime] = useState('09:00');
+  const [workEndTime, setWorkEndTime] = useState('17:00');
   const [hasLunchBreak, setHasLunchBreak] = useState(true);
   const [lunchStartTime, setLunchStartTime] = useState('13:00');
   const [lunchDuration, setLunchDuration] = useState(45);
-  const [selectedPreset, setSelectedPreset] = useState<string>('full_day');
+  const [selectedPreset, setSelectedPreset] = useState<string>('9-5');
   const [energy, setEnergy] = useState<'deep_focus' | 'light'>('deep_focus');
 
   // Section 2: Priority & Commitments

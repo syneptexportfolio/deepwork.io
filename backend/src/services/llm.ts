@@ -164,7 +164,7 @@ QUESTIONNAIRE RESPONSES:
 - Available focus hours today: ${answers.available_hours} hours
 - Wake time: ${answers.wake_time}
 - Sleep time: ${answers.sleep_time}
-- Core Working Hours: ${answers.work_start_time || '09:00'} to ${answers.work_end_time || '18:00'}
+- Core Working Hours: ${answers.work_start_time || '09:00'} to ${answers.work_end_time || '17:00'}
 - Midday Lunch Break: ${answers.lunch_start_time ? `${answers.lunch_start_time} (${answers.lunch_duration_minutes || 45} mins)` : 'None'}
 - Energy level: ${answers.energy_level}
 - Top priority for today: "${answers.top_priority}"
@@ -172,31 +172,36 @@ QUESTIONNAIRE RESPONSES:
 - Style preference: "${answers.focus_preference || 'Deep work early, lighter review later'}"
 
 SCHEDULING RULES:
-1. FIXED ANCHORS: Any task with a scheduled_time (e.g. meetings, calls, appointments) or mentioned in fixed commitments MUST be locked to that exact start time.
-2. NO DUPLICATES: Every task, habit, and to-do must appear at most once in the timetable. Never schedule the same item twice.
-3. CHRONOLOGICAL TIME-OF-DAY BUCKET CONTRACT (STRICT):
+1. STRICT TIMEFRAME BOUNDARIES (MANDATORY):
+   - The entire timetable MUST start strictly at ${answers.work_start_time || '09:00'}.
+   - ALL tasks, long-term goals, habits, and breaks MUST strictly conclude at or before ${answers.work_end_time || '17:00'}.
+   - NEVER schedule any block before ${answers.work_start_time || '09:00'} or after ${answers.work_end_time || '17:00'}.
+2. FIXED ANCHORS: Any task with a scheduled_time (e.g. meetings, calls, appointments) or mentioned in fixed commitments MUST be locked to that exact start time.
+3. NO DUPLICATES: Every task, habit, and to-do must appear at most once in the timetable. Never schedule the same item twice.
+4. CHRONOLOGICAL TIME-OF-DAY BUCKET CONTRACT:
    - MORNING WINDOW (${answers.work_start_time || '09:00'} → ${answers.lunch_start_time || '13:00'}):
-     - Reserved STRICTLY for tasks in the 'Morning' bucket, morning quick to-dos, and top priorities.
-     - Prime 75-90m morning focus block (e.g. 09:00-10:30) MUST be assigned to the user's top_priority or the highest-priority task from the 'Morning' bucket (e.g. "High-yield concept review").
-     - NEVER schedule Afternoon or Evening tasks into the Morning window.
+     - Reserved for tasks in the 'Morning' bucket, morning quick to-dos, and top priorities.
+     - Prime 60-75m morning focus block (e.g. 09:00-10:15) MUST be assigned to the user's top_priority or the highest-priority task from the 'Morning' bucket.
    - MIDDAY LUNCH BREAK (${answers.lunch_start_time || '13:00'} for ${answers.lunch_duration_minutes || 45} mins):
      - Insert a protected "Lunch & recharge" break (block_source="break", category="Rest & Hydration").
-   - AFTERNOON WINDOW (Lunch End → ${answers.work_end_time || '18:00'}):
-     - Allocate dedicated 60m focus blocks for any selected Long-Term Goal / Roadmap (block_source="long_term_goal", titled "[Goal Title]: [Next Topic]"). Early afternoon (e.g. 14:00) is the ideal slot for curriculum / roadmap advancement.
-     - Schedule tasks in the 'Afternoon' bucket (calls, meetings, outreach, action items).
-     - NEVER schedule Evening tasks into the afternoon unless all afternoon tasks are complete and time allows.
-   - EVENING WINDOW (${answers.work_end_time || '18:00'} → ${answers.sleep_time}):
-     - Schedule tasks from the 'Evening' bucket (e.g. "Ship feature component & tests", personal project shipping, evening study).
-     - Schedule evening lifestyle habits (e.g. workouts, reading, wind-down).
-4. HABIT RULES: 
-   - Only schedule habits on the hourly timetable if they are TIMED focus sessions (e.g. "Morning planning", "Meditation", "Workout" where type='timed' and duration > 0).
+   - AFTERNOON WINDOW (Lunch End → Late Afternoon):
+     - Reserved for tasks in the 'Afternoon' bucket (calls, meetings, outreach, action items).
+   - EVENING WINDOW (Late Afternoon → ${answers.work_end_time || '17:00'}):
+     - Reserved for tasks in the 'Evening' bucket (wrap-up items, review, commits).
+5. INTERLEAVE LONG-TERM GOALS (DO NOT CLUSTER SEQUENTIALLY):
+   - Do NOT cluster long-term roadmap goals back-to-back in a single rigid block.
+   - Interleave and distribute long-term roadmap goals flexibly among the daily tasks within the workday timeframe (for example, 1 goal block in the morning alternating with a morning task, and 1 goal block in the afternoon alternating with an afternoon task).
+6. HARD CEILING AT ${answers.work_end_time || '17:00'}:
+   - If the total duration of selected work exceeds the available capacity between ${answers.work_start_time || '09:00'} and ${answers.work_end_time || '17:00'}, prioritize highest-priority items and omit lower-priority overflow tasks so the schedule strictly ends at or before ${answers.work_end_time || '17:00'}.
+7. HABIT RULES: 
+   - Only schedule habits on the hourly timetable if they are TIMED focus sessions (e.g. "Morning planning", "Daily Review" where type='timed' and duration > 0).
    - Do NOT insert check-off milestones ("Wake up early") or all-day metric targets ("Drink 3L Water", "Walk 10,000+ Steps") as work blocks on the timetable—those are managed in the dedicated Daily Anchors panel.
-5. ZERO OVERLAPS: Ensure no two blocks overlap in time. Each block's start_time must be greater than or equal to the previous block's end_time.
-6. UNTIMED TASKS: For untimed tasks (duration 0, meetings, calls, errands), schedule them with "is_untimed": true and "target_label": "⚡ Action item" or "🕒 HH:MM".
-7. RECHARGE BREAKS: Insert 10-15 minute "Step away & recharge" breaks between deep work sessions.
-8. ASSIGN TASK IDs: For any block created from an existing task in the list, set "task_id" to that task's id; otherwise set null.
-9. TIME FORMAT: 24-hour "HH:MM".
-10. BLOCK SOURCE: One of: "habit", "long_term_goal", "daily_todo", "break".
+8. ZERO OVERLAPS: Ensure no two blocks overlap in time. Each block's start_time must be greater than or equal to the previous block's end_time.
+9. UNTIMED TASKS: For untimed tasks (duration 0, meetings, calls, errands), schedule them with "is_untimed": true and "target_label": "⚡ Action item" or "🕒 HH:MM".
+10. RECHARGE BREAKS: Insert 10-15 minute "Step away & recharge" breaks between deep work sessions.
+11. ASSIGN TASK IDs: For any block created from an existing task in the list, set "task_id" to that task's id; otherwise set null.
+12. TIME FORMAT: 24-hour "HH:MM".
+13. BLOCK SOURCE: One of: "habit", "long_term_goal", "daily_todo", "break".
 
 OUTPUT FORMAT:
 Return a valid JSON array of ScheduleBlock objects conforming strictly to this schema:
@@ -267,8 +272,8 @@ export function generateSmartFallbackSchedule(
 
   const wakeMin = parseTime(answers.wake_time, 7 * 60 + 30);
   const sleepMin = parseTime(answers.sleep_time, 23 * 60 + 30);
-  const workStartMin = parseTime(answers.work_start_time || '09:30', 9 * 60 + 30);
-  const workEndMin = parseTime(answers.work_end_time || '18:30', 18 * 60 + 30);
+  const workStartMin = parseTime(answers.work_start_time || '09:00', 9 * 60);
+  const workEndMin = parseTime(answers.work_end_time || '17:00', 17 * 60);
   const lunchStartMin = answers.lunch_start_time ? parseTime(answers.lunch_start_time, 13 * 60) : 13 * 60;
   const lunchDur = answers.lunch_duration_minutes !== undefined ? answers.lunch_duration_minutes : 45;
 
@@ -276,10 +281,6 @@ export function generateSmartFallbackSchedule(
   const activeHabits = answers.selected_habit_ids && answers.selected_habit_ids.length > 0
     ? habits.filter(h => answers.selected_habit_ids!.includes(h.id))
     : habits.filter(h => h.is_active);
-
-  const morningHabits = activeHabits.filter(h => h.anchor === 'morning');
-  const floatingHabits = activeHabits.filter(h => h.anchor === 'floating');
-  const eveningHabits = activeHabits.filter(h => h.anchor === 'evening');
 
   const activeWeeklyGoals = answers.selected_weekly_goal_ids && answers.selected_weekly_goal_ids.length > 0
     ? weeklyGoals.filter(w => answers.selected_weekly_goal_ids!.includes(w.id))
@@ -301,95 +302,141 @@ export function generateSmartFallbackSchedule(
   const afternoonTasks = unfixedTasks.filter(t => t.column_bucket === 'up_next');
   const eveningTasks = unfixedTasks.filter(t => t.column_bucket === 'later');
 
-  let currentMinutes = wakeMin;
+  // Prepare Long-Term Goals queue for flexible interleaving across the day
+  const ltgQueue = activeLongTermGoals.map(ltg => {
+    const cfg = answers.long_term_goal_configs?.find(c => c.goal_id === ltg.id);
+    const selectedTopic = ltg.syllabus?.find((s: any) => s.id === cfg?.topic_id) 
+      || ltg.syllabus?.find((s: any) => !s.covered) 
+      || ltg.syllabus?.[0];
+    const fallbackTitle = selectedTopic ? `${ltg.title}: ${selectedTopic.name}` : `${ltg.title}: Roadmap Milestone`;
+    const ltgTitle = cfg?.task_title?.trim() || fallbackTitle;
+    const dur = cfg?.duration_minutes && cfg.duration_minutes > 0 ? cfg.duration_minutes : 60;
+    const energyType = cfg?.energy_level || 'deep_focus';
+    return { ltg, selectedTopic, ltgTitle, dur, energyType };
+  });
 
-  // --- MORNING PHASE ---
-  // A. Morning Habits (Only schedule TIMED focus habits on timetable; milestones live in Daily Anchors)
-  for (const hab of morningHabits) {
-    if (hab.habit_type === 'check_off' || hab.habit_type === 'target') continue;
+  // START STRICTLY AT workStartMin (e.g. 09:00 AM)
+  let currentMinutes = workStartMin;
 
-    const meta = getHabitDisplayMeta(hab);
+  function canFit(duration: number): boolean {
+    return currentMinutes + duration <= workEndMin;
+  }
+
+  // --- MORNING PHASE (workStartMin → Lunch) ---
+  // A. Optional timed morning planning habit (if type is timed)
+  const morningTimedHabit = activeHabits.find(h => h.anchor === 'morning' && h.habit_type !== 'check_off' && h.habit_type !== 'target');
+  if (morningTimedHabit && canFit(morningTimedHabit.duration_minutes || 15)) {
+    const meta = getHabitDisplayMeta(morningTimedHabit);
     const s = formatTime(currentMinutes);
     currentMinutes += meta.duration;
     const e = formatTime(currentMinutes);
-
     blocks.push({
       id: `block-${blocks.length + 1}`,
       task_id: null,
-      title: hab.title,
+      title: morningTimedHabit.title,
       start_time: s,
       end_time: e,
       duration: meta.duration,
-      type: hab.energy_level || 'light',
+      type: morningTimedHabit.energy_level || 'light',
       block_source: 'habit',
       category: 'Daily Habit',
       status: 'pending',
-      reasoning: 'Morning timed session scheduled directly after waking.',
+      reasoning: 'Morning alignment & planning at the start of the workday.',
       target_label: meta.target_label,
       is_untimed: meta.is_untimed
     });
-    scheduledTitles.add(hab.title.toLowerCase().trim());
+    scheduledTitles.add(morningTimedHabit.title.toLowerCase().trim());
   }
 
-  // Transition to Core Work Window: work begins strictly at workStartMin (e.g. 09:00 AM)
-  currentMinutes = Math.max(currentMinutes, workStartMin);
-
-  // --- PRIME FOCUS PHASE (STARTS AT workStartMin) ---
-  // B. Prime Morning Deep Focus Block (Stated main priority or top morning task)
+  // B. Prime Morning Deep Focus Block (from morningTasks or top priority)
   const primaryMorningTask = morningTasks.find(t => t.priority === 'HIGH' && !scheduledTitles.has(t.title.toLowerCase().trim()))
     || morningTasks.find(t => !scheduledTitles.has(t.title.toLowerCase().trim()))
     || (morningTasks.length === 0 ? unfixedTasks.find(t => t.priority === 'HIGH' && !scheduledTitles.has(t.title.toLowerCase().trim())) : null);
 
-  const dur1 = answers.energy_level === 'light' ? 60 : 90;
-  const s1 = formatTime(currentMinutes);
-  currentMinutes += dur1;
-  const e1 = formatTime(currentMinutes);
+  const dur1 = answers.energy_level === 'light' ? 60 : 75;
+  if (canFit(dur1)) {
+    const s1 = formatTime(currentMinutes);
+    currentMinutes += dur1;
+    const e1 = formatTime(currentMinutes);
 
-  const primaryTitle = answers.top_priority && answers.top_priority.trim() !== '' && answers.top_priority !== 'Core daily priorities'
-    ? answers.top_priority.trim()
-    : (primaryMorningTask ? primaryMorningTask.title : 'Morning Deep Focus Sprint');
+    const primaryTitle = answers.top_priority && answers.top_priority.trim() !== '' && answers.top_priority !== 'Core daily priorities'
+      ? answers.top_priority.trim()
+      : (primaryMorningTask ? primaryMorningTask.title : 'Morning Deep Focus Sprint');
 
-  blocks.push({
-    id: `block-${blocks.length + 1}`,
-    task_id: primaryMorningTask?.id || null,
-    title: primaryTitle,
-    start_time: s1,
-    end_time: e1,
-    duration: dur1,
-    type: 'deep_focus',
-    block_source: 'daily_todo',
-    category: primaryMorningTask?.category || 'Morning Focus',
-    status: 'pending',
-    reasoning: 'Prime morning cognitive peak allocated to main priority advancement.'
-  });
-  scheduledTitles.add(primaryTitle.toLowerCase().trim());
-  if (primaryMorningTask) scheduledTitles.add(primaryMorningTask.title.toLowerCase().trim());
+    blocks.push({
+      id: `block-${blocks.length + 1}`,
+      task_id: primaryMorningTask?.id || null,
+      title: primaryTitle,
+      start_time: s1,
+      end_time: e1,
+      duration: dur1,
+      type: 'deep_focus',
+      block_source: 'daily_todo',
+      category: primaryMorningTask?.category || 'Morning Focus',
+      status: 'pending',
+      reasoning: 'Prime morning cognitive peak allocated to main priority.'
+    });
+    scheduledTitles.add(primaryTitle.toLowerCase().trim());
+    if (primaryMorningTask) scheduledTitles.add(primaryMorningTask.title.toLowerCase().trim());
 
-  // C. Recharge Break
-  const bs1 = formatTime(currentMinutes);
-  currentMinutes += 15;
-  const be1 = formatTime(currentMinutes);
-  blocks.push({
-    id: `block-${blocks.length + 1}`,
-    task_id: null,
-    title: 'Step away & recharge',
-    start_time: bs1,
-    end_time: be1,
-    duration: 15,
-    type: 'break',
-    block_source: 'break',
-    category: 'Rest & Hydration',
-    status: 'pending',
-    reasoning: 'Screen-free mental break to consolidate deep work learning.'
-  });
+    // Recharge Break
+    if (canFit(15)) {
+      const bs1 = formatTime(currentMinutes);
+      currentMinutes += 15;
+      const be1 = formatTime(currentMinutes);
+      blocks.push({
+        id: `block-${blocks.length + 1}`,
+        task_id: null,
+        title: 'Step away & recharge',
+        start_time: bs1,
+        end_time: be1,
+        duration: 15,
+        type: 'break',
+        block_source: 'break',
+        category: 'Rest & Hydration',
+        status: 'pending',
+        reasoning: 'Screen-free mental break to consolidate deep work.'
+      });
+    }
+  }
 
-  // D. Remaining Morning Tasks (from Morning bucket ONLY, before lunch)
+  // C. Interleave 1 Long-Term Goal in the Morning (if one exists and fits before lunch)
+  const morningCeiling = lunchDur > 0 ? lunchStartMin : workEndMin;
+  if (ltgQueue.length > 0) {
+    const nextLtg = ltgQueue[0];
+    if (currentMinutes + nextLtg.dur <= morningCeiling && canFit(nextLtg.dur)) {
+      ltgQueue.shift(); // Dequeue
+      const s = formatTime(currentMinutes);
+      currentMinutes += nextLtg.dur;
+      const e = formatTime(currentMinutes);
+
+      blocks.push({
+        id: `block-${blocks.length + 1}`,
+        task_id: null,
+        topic_id: nextLtg.selectedTopic?.id || null,
+        goal_id: nextLtg.ltg.id,
+        title: nextLtg.ltgTitle,
+        start_time: s,
+        end_time: e,
+        duration: nextLtg.dur,
+        type: nextLtg.energyType,
+        block_source: 'long_term_goal',
+        category: nextLtg.ltg.category || 'Learning Path',
+        status: 'pending',
+        reasoning: `Interleaved milestone study block for "${nextLtg.ltg.title}".`
+      });
+      scheduledTitles.add(nextLtg.ltg.title.toLowerCase().trim());
+      scheduledTitles.add(nextLtg.ltgTitle.toLowerCase().trim());
+    }
+  }
+
+  // D. Remaining Morning Tasks before lunch
   for (const t of morningTasks) {
     if (scheduledTitles.has(t.title.toLowerCase().trim())) continue;
-
     const isUntimed = t.duration_minutes === 0;
     const dur = isUntimed ? 25 : t.duration_minutes;
-    if (lunchDur > 0 && currentMinutes + dur > lunchStartMin) break;
+
+    if (currentMinutes + dur > morningCeiling || !canFit(dur)) break;
 
     const s = formatTime(currentMinutes);
     currentMinutes += dur;
@@ -406,20 +453,19 @@ export function generateSmartFallbackSchedule(
       block_source: 'daily_todo',
       category: t.category || 'Morning Focus',
       status: 'pending',
-      reasoning: 'Morning priority work task scheduled during focused morning hours.',
+      reasoning: 'Morning task scheduled in morning focus window.',
       target_label: isUntimed ? '⚡ Action item' : undefined,
       is_untimed: isUntimed
     });
     scheduledTitles.add(t.title.toLowerCase().trim());
   }
 
-  // E. Quick Morning To-Dos Brain Dump (inside morning work hours)
+  // E. Quick Morning To-Dos Brain Dump
   if (answers.morning_todos && answers.morning_todos.length > 0) {
     for (const td of answers.morning_todos) {
       if (!td.title || scheduledTitles.has(td.title.toLowerCase().trim())) continue;
-
       const dur = td.duration_minutes || 20;
-      if (lunchDur > 0 && currentMinutes + dur > lunchStartMin) break;
+      if (currentMinutes + dur > morningCeiling || !canFit(dur)) break;
 
       const s = formatTime(currentMinutes);
       currentMinutes += dur;
@@ -442,140 +488,101 @@ export function generateSmartFallbackSchedule(
     }
   }
 
-  // --- MIDDAY / FIXED ANCHORS ---
-  // F. Fixed Scheduled Tasks (meetings, appointments with scheduled_start)
-  for (const ft of fixedTasks) {
-    if (scheduledTitles.has(ft.title.toLowerCase().trim())) continue;
-
-    const fStart = parseTime(ft.scheduled_start || '', currentMinutes);
-    const isUntimed = ft.duration_minutes === 0;
-    const fDur = isUntimed ? 30 : ft.duration_minutes;
-    const fEnd = fStart + fDur;
-
-    blocks.push({
-      id: `block-${blocks.length + 1}`,
-      task_id: ft.id,
-      title: ft.title,
-      start_time: formatTime(fStart),
-      end_time: formatTime(fEnd),
-      duration: fDur,
-      type: 'light',
-      block_source: 'daily_todo',
-      category: ft.category || 'Fixed Commitment',
-      status: 'pending',
-      reasoning: 'Fixed schedule anchor locked to designated start time.',
-      target_label: isUntimed ? `🕒 ${ft.scheduled_start}` : undefined,
-      is_untimed: isUntimed
-    });
-    scheduledTitles.add(ft.title.toLowerCase().trim());
-  }
-
   // --- MIDDAY LUNCH BREAK ---
-  if (lunchDur > 0) {
+  if (lunchDur > 0 && canFit(lunchDur)) {
     const lStart = Math.max(currentMinutes, lunchStartMin);
-    const lEnd = lStart + lunchDur;
-    blocks.push({
-      id: `block-${blocks.length + 1}`,
-      task_id: null,
-      title: 'Lunch & recharge',
-      start_time: formatTime(lStart),
-      end_time: formatTime(lEnd),
-      duration: lunchDur,
-      type: 'break',
-      block_source: 'break',
-      category: 'Rest & Hydration',
-      status: 'pending',
-      reasoning: 'Protected midday meal and cognitive recovery break.'
-    });
-    currentMinutes = lEnd;
-  } else {
-    currentMinutes = Math.max(currentMinutes + 30, 14 * 60);
-  }
-
-  // --- AFTERNOON PHASE (Post-Lunch Focus & Afternoon Tasks) ---
-  // G0. Long-Term Goal / Roadmap Dedicated Study Block
-  for (const ltg of activeLongTermGoals.slice(0, 2)) {
-    if (scheduledTitles.has(ltg.title.toLowerCase().trim())) continue;
-
-    const cfg = answers.long_term_goal_configs?.find(c => c.goal_id === ltg.id);
-    const selectedTopic = ltg.syllabus?.find((s: any) => s.id === cfg?.topic_id) 
-      || ltg.syllabus?.find((s: any) => !s.covered) 
-      || ltg.syllabus?.[0];
-    const fallbackTitle = selectedTopic ? `${ltg.title}: ${selectedTopic.name}` : `${ltg.title}: Roadmap Milestone`;
-    const ltgTitle = cfg?.task_title?.trim() || fallbackTitle;
-    const dur = cfg?.duration_minutes && cfg.duration_minutes > 0 ? cfg.duration_minutes : 60;
-    const energyType = cfg?.energy_level || 'deep_focus';
-
-    if (currentMinutes + dur <= workEndMin) {
-      const s = formatTime(currentMinutes);
-      currentMinutes += dur;
-      const e = formatTime(currentMinutes);
-
+    if (lStart + lunchDur <= workEndMin) {
+      currentMinutes = lStart;
+      const lEnd = currentMinutes + lunchDur;
       blocks.push({
         id: `block-${blocks.length + 1}`,
         task_id: null,
-        topic_id: selectedTopic?.id || null,
-        goal_id: ltg.id,
-        title: ltgTitle,
-        start_time: s,
-        end_time: e,
-        duration: dur,
-        type: energyType,
-        block_source: 'long_term_goal',
-        category: ltg.category || 'Learning Path',
+        title: 'Lunch & recharge',
+        start_time: formatTime(currentMinutes),
+        end_time: formatTime(lEnd),
+        duration: lunchDur,
+        type: 'break',
+        block_source: 'break',
+        category: 'Rest & Hydration',
         status: 'pending',
-        reasoning: `Dedicated milestone study block for long-term roadmap "${ltg.title}".`
+        reasoning: 'Protected midday meal and cognitive recovery break.'
       });
-      scheduledTitles.add(ltg.title.toLowerCase().trim());
-      scheduledTitles.add(ltgTitle.toLowerCase().trim());
+      currentMinutes = lEnd;
     }
   }
 
-  // G. Floating Habits (Timed focus habits)
-  for (const fHab of floatingHabits.slice(0, 2)) {
-    if (fHab.habit_type === 'check_off' || fHab.habit_type === 'target') continue;
-    if (scheduledTitles.has(fHab.title.toLowerCase().trim())) continue;
-
-    const meta = getHabitDisplayMeta(fHab);
-    if (currentMinutes + meta.duration <= workEndMin) {
-      const s = formatTime(currentMinutes);
-      currentMinutes += meta.duration;
-      const e = formatTime(currentMinutes);
-
-      blocks.push({
-        id: `block-${blocks.length + 1}`,
-        task_id: null,
-        title: fHab.title,
-        start_time: s,
-        end_time: e,
-        duration: meta.duration,
-        type: 'light',
-        block_source: 'habit',
-        category: 'Daily Habit',
-        status: 'pending',
-        reasoning: 'Midday floating timed habit.',
-        target_label: meta.target_label,
-        is_untimed: meta.is_untimed
-      });
-      scheduledTitles.add(fHab.title.toLowerCase().trim());
-    }
-  }
-
-  // H. Afternoon Tasks (from Afternoon bucket: up_next)
+  // --- AFTERNOON PHASE ---
+  // Sort afternoon tasks by priority
   const sortedAfternoonTasks = [...afternoonTasks].sort((a, b) => {
     const pOrder: Record<string, number> = { HIGH: 1, MEDIUM: 2, LOW: 3 };
     return (pOrder[a.priority || 'MEDIUM'] ?? 2) - (pOrder[b.priority || 'MEDIUM'] ?? 2);
   });
 
-  for (const at of sortedAfternoonTasks) {
-    if (scheduledTitles.has(at.title.toLowerCase().trim())) continue;
+  // Schedule first afternoon task
+  if (sortedAfternoonTasks.length > 0) {
+    const at = sortedAfternoonTasks[0];
+    if (!scheduledTitles.has(at.title.toLowerCase().trim())) {
+      const isUntimed = at.duration_minutes === 0;
+      const dur = isUntimed ? 30 : at.duration_minutes;
+      if (canFit(dur)) {
+        const s = formatTime(currentMinutes);
+        currentMinutes += dur;
+        const e = formatTime(currentMinutes);
+        blocks.push({
+          id: `block-${blocks.length + 1}`,
+          task_id: at.id,
+          title: at.title,
+          start_time: s,
+          end_time: e,
+          duration: dur,
+          type: at.energy_level || 'light',
+          block_source: 'daily_todo',
+          category: at.category || 'Afternoon Work',
+          status: 'pending',
+          reasoning: 'Afternoon execution block scheduled within afternoon hours.',
+          target_label: isUntimed ? '⚡ Action item' : undefined,
+          is_untimed: isUntimed
+        });
+        scheduledTitles.add(at.title.toLowerCase().trim());
+      }
+    }
+  }
 
+  // Interleave another Long-Term Goal in the Afternoon (if queue has items)
+  if (ltgQueue.length > 0) {
+    const nextLtg = ltgQueue.shift()!;
+    if (canFit(nextLtg.dur)) {
+      const s = formatTime(currentMinutes);
+      currentMinutes += nextLtg.dur;
+      const e = formatTime(currentMinutes);
+
+      blocks.push({
+        id: `block-${blocks.length + 1}`,
+        task_id: null,
+        topic_id: nextLtg.selectedTopic?.id || null,
+        goal_id: nextLtg.ltg.id,
+        title: nextLtg.ltgTitle,
+        start_time: s,
+        end_time: e,
+        duration: nextLtg.dur,
+        type: nextLtg.energyType,
+        block_source: 'long_term_goal',
+        category: nextLtg.ltg.category || 'Learning Path',
+        status: 'pending',
+        reasoning: `Interleaved milestone study block for "${nextLtg.ltg.title}".`
+      });
+      scheduledTitles.add(nextLtg.ltg.title.toLowerCase().trim());
+      scheduledTitles.add(nextLtg.ltgTitle.toLowerCase().trim());
+    }
+  }
+
+  // Remaining Afternoon Tasks
+  for (const at of sortedAfternoonTasks.slice(1)) {
+    if (scheduledTitles.has(at.title.toLowerCase().trim())) continue;
     const isUntimed = at.duration_minutes === 0;
     const dur = isUntimed ? 30 : at.duration_minutes;
-
-    if (currentMinutes + dur > workEndMin) {
-      break; // Workday afternoon capacity reached
-    }
+    const eveningReserve = eveningTasks.length > 0 ? 45 : 0;
+    if (currentMinutes + dur > workEndMin - eveningReserve || !canFit(dur)) break;
 
     const s = formatTime(currentMinutes);
     currentMinutes += dur;
@@ -599,25 +606,51 @@ export function generateSmartFallbackSchedule(
     scheduledTitles.add(at.title.toLowerCase().trim());
   }
 
-  // --- EVENING PHASE (Evening Tasks & Wind-Down Habits) ---
-  // I. Evening Tasks (from Evening bucket: later)
+  // Floating habits if time permits
+  const floatingHabits = activeHabits.filter(h => h.anchor === 'floating');
+  for (const fHab of floatingHabits) {
+    if (fHab.habit_type === 'check_off' || fHab.habit_type === 'target') continue;
+    if (scheduledTitles.has(fHab.title.toLowerCase().trim())) continue;
+
+    const meta = getHabitDisplayMeta(fHab);
+    const eveningReserve = eveningTasks.length > 0 ? 45 : 0;
+    if (currentMinutes + meta.duration > workEndMin - eveningReserve || !canFit(meta.duration)) break;
+
+    const s = formatTime(currentMinutes);
+    currentMinutes += meta.duration;
+    const e = formatTime(currentMinutes);
+
+    blocks.push({
+      id: `block-${blocks.length + 1}`,
+      task_id: null,
+      title: fHab.title,
+      start_time: s,
+      end_time: e,
+      duration: meta.duration,
+      type: 'light',
+      block_source: 'habit',
+      category: 'Daily Habit',
+      status: 'pending',
+      reasoning: 'Midday floating timed habit.',
+      target_label: meta.target_label,
+      is_untimed: meta.is_untimed
+    });
+    scheduledTitles.add(fHab.title.toLowerCase().trim());
+  }
+
+  // --- EVENING / WORKDAY WRAP-UP PHASE (Before workEndMin) ---
   const sortedEveningTasks = [...eveningTasks].sort((a, b) => {
     const pOrder: Record<string, number> = { HIGH: 1, MEDIUM: 2, LOW: 3 };
     return (pOrder[a.priority || 'MEDIUM'] ?? 2) - (pOrder[b.priority || 'MEDIUM'] ?? 2);
   });
 
-  // Start evening phase at either currentMinutes or workEndMin
-  currentMinutes = Math.max(currentMinutes, workEndMin);
-
   for (const et of sortedEveningTasks) {
     if (scheduledTitles.has(et.title.toLowerCase().trim())) continue;
 
     const isUntimed = et.duration_minutes === 0;
-    const dur = isUntimed ? 30 : (et.duration_minutes > 0 ? et.duration_minutes : 45);
+    const dur = isUntimed ? 25 : (et.duration_minutes > 0 ? et.duration_minutes : 30);
 
-    if (currentMinutes + dur > sleepMin - 30) {
-      break; // Reached bedtime threshold
-    }
+    if (!canFit(dur)) break; // HARD STOP at workEndMin
 
     const s = formatTime(currentMinutes);
     currentMinutes += dur;
@@ -632,46 +665,68 @@ export function generateSmartFallbackSchedule(
       duration: dur,
       type: et.energy_level || 'light',
       block_source: 'daily_todo',
-      category: et.category || 'Evening Focus',
+      category: et.category || 'Evening Wrap-Up',
       status: 'pending',
-      reasoning: 'Evening priority task scheduled in dedicated evening block.',
+      reasoning: 'Evening priority task scheduled in dedicated wrap-up block before workday end.',
       target_label: isUntimed ? '⚡ Action item' : undefined,
       is_untimed: isUntimed
     });
     scheduledTitles.add(et.title.toLowerCase().trim());
   }
 
-  // J. Evening Habits (Timed fitness/workouts or wind-down)
-  for (const evHab of eveningHabits) {
-    if (evHab.habit_type === 'check_off' || evHab.habit_type === 'target') continue;
-    if (scheduledTitles.has(evHab.title.toLowerCase().trim())) continue;
+  // Optional evening habit (shutdown ritual)
+  const eveningTimedHabit = activeHabits.find(h => h.anchor === 'evening' && h.habit_type !== 'check_off' && h.habit_type !== 'target');
+  if (eveningTimedHabit && !scheduledTitles.has(eveningTimedHabit.title.toLowerCase().trim())) {
+    const meta = getHabitDisplayMeta(eveningTimedHabit);
+    if (canFit(meta.duration)) {
+      const s = formatTime(currentMinutes);
+      currentMinutes += meta.duration;
+      const e = formatTime(currentMinutes);
 
-    const meta = getHabitDisplayMeta(evHab);
-    // If it is a longer active habit (e.g. workout >= 30m), place right after work/evening tasks
-    // If it is a short wind-down habit, place shortly before sleep
-    let evStart = currentMinutes;
-    if (meta.duration <= 30 && sleepMin - meta.duration - 15 > currentMinutes) {
-      evStart = sleepMin - meta.duration - 15;
-    }
-
-    if (evStart + meta.duration <= sleepMin) {
       blocks.push({
         id: `block-${blocks.length + 1}`,
         task_id: null,
-        title: evHab.title,
-        start_time: formatTime(evStart),
-        end_time: formatTime(evStart + meta.duration),
+        title: eveningTimedHabit.title,
+        start_time: s,
+        end_time: e,
         duration: meta.duration,
-        type: evHab.energy_level || 'light',
+        type: eveningTimedHabit.energy_level || 'light',
         block_source: 'habit',
         category: 'Daily Habit',
         status: 'pending',
-        reasoning: 'Evening habit or wind-down ritual.',
+        reasoning: 'Evening shutdown & daily review ritual before workday conclusion.',
         target_label: meta.target_label,
         is_untimed: meta.is_untimed
       });
-      scheduledTitles.add(evHab.title.toLowerCase().trim());
-      currentMinutes = Math.max(currentMinutes, evStart + meta.duration);
+      scheduledTitles.add(eveningTimedHabit.title.toLowerCase().trim());
+    }
+  }
+
+  // Fixed tasks (locked to their scheduled_start within work window)
+  for (const ft of fixedTasks) {
+    if (scheduledTitles.has(ft.title.toLowerCase().trim())) continue;
+    const fStart = parseTime(ft.scheduled_start || '', workStartMin);
+    const isUntimed = ft.duration_minutes === 0;
+    const fDur = isUntimed ? 30 : ft.duration_minutes;
+    const fEnd = fStart + fDur;
+
+    if (fStart >= workStartMin && fEnd <= workEndMin) {
+      blocks.push({
+        id: `block-${blocks.length + 1}`,
+        task_id: ft.id,
+        title: ft.title,
+        start_time: formatTime(fStart),
+        end_time: formatTime(fEnd),
+        duration: fDur,
+        type: 'light',
+        block_source: 'daily_todo',
+        category: ft.category || 'Fixed Commitment',
+        status: 'pending',
+        reasoning: 'Fixed schedule anchor locked to designated start time.',
+        target_label: isUntimed ? `🕒 ${ft.scheduled_start}` : undefined,
+        is_untimed: isUntimed
+      });
+      scheduledTitles.add(ft.title.toLowerCase().trim());
     }
   }
 
