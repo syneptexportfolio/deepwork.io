@@ -44,29 +44,34 @@ export function formatBlockReminder(
   const normTitle = (title || '').toLowerCase();
   const isLunch = type === 'break' && (normTitle.includes('lunch') || normTitle.includes('meal') || normTitle.includes('food'));
   const isBreak = type === 'break' && !isLunch;
+  const durText = durationMinutes > 0 ? `${durationMinutes} mins` : 'Action item';
 
   if (isLunch) {
-    return `🍱 <b>Luma Midday Break in 5 mins</b>\n\n` +
+    return `🍱 <b>Hi! Assistant JUGNU DAS this side.</b>\n` +
+           `Quick heads-up — your midday lunch break starts in 5 minutes:\n\n` +
            `🍽️ <b>${title}</b>\n` +
-           `⏰ Starts at <b>${startTime}</b> (${durationMinutes} mins)\n\n` +
-           `<i>"Step away from your screen, nourish your body, and rest."</i>`;
+           `⏰ Starts at <b>${startTime}</b> (${durText})\n\n` +
+           `📊 Track your progress: https://deepwork-io.pages.dev`;
   }
 
   if (isBreak) {
-    return `☕ <b>Luma Recovery Break in 5 mins</b>\n\n` +
+    return `☕ <b>Hi! Assistant JUGNU DAS this side.</b>\n` +
+           `Quick heads-up — your recovery break starts in 5 minutes:\n\n` +
            `🌿 <b>${title}</b>\n` +
-           `⏰ Starts at <b>${startTime}</b> (${durationMinutes} mins)\n\n` +
-           `<i>"Rest your eyes, hydrate, and consolidate your focus."</i>`;
+           `⏰ Starts at <b>${startTime}</b> (${durText})\n\n` +
+           `📊 Track your progress: https://deepwork-io.pages.dev`;
   }
 
   const cat = category ? ` • <i>${category}</i>` : '';
   const icon = type === 'deep_focus' ? '⚡' : '🎯';
   const label = type === 'deep_focus' ? 'Deep Focus Session' : 'Scheduled Commitment';
 
-  return `${icon} <b>Luma ${label} in 5 mins</b>\n\n` +
+  return `👋 <b>Hi! Assistant JUGNU DAS this side.</b>\n` +
+         `Here is your 5-minute reminder for your next session:\n\n` +
+         `${icon} <b>${label}</b>\n` +
          `🎯 <b>${title}</b>${cat}\n` +
-         `⏰ Starts at <b>${startTime}</b> (${durationMinutes} mins)\n\n` +
-         `<i>"One clear commitment at a time. Protect your rhythm."</i>`;
+         `⏰ Starts at <b>${startTime}</b> (${durText})\n\n` +
+         `📊 Track your progress: https://deepwork-io.pages.dev`;
 }
 
 export function formatTaskReminder(

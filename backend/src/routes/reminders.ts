@@ -154,10 +154,10 @@ remindersRouter.post('/test', async (c) => {
       }, 400);
     }
 
-    const testMsg = `🌟 <b>deepwork.io Telegram Integration Connected!</b>\n\n` +
-      `Your automated task reminders are active.\n` +
-      `You will receive timely focus notifications 10 minutes before each scheduled session.\n\n` +
-      `<i>"One clear commitment at a time. Protect your rhythm."</i>`;
+    const testMsg = `🌟 <b>deepwork-io.pages.dev Telegram Integration Connected!</b>\n\n` +
+      `👋 <b>Assistant JUGNU DAS this side.</b>\n` +
+      `Your automated reminders are now active! I'll send you a heads-up 5 minutes before each scheduled session on your timetable.\n\n` +
+      `📊 Track your progress: https://deepwork-io.pages.dev`;
 
     const res = await sendTelegramMessage(token, chatId, testMsg);
     if (!res.success) {
