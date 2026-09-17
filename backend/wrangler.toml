@@ -8,7 +8,7 @@ binding = "DB"
 database_name = "deepwork-db"
 # Provision remote database: npx wrangler d1 create deepwork-db
 # Paste the resulting UUID into database_id before 'wrangler deploy'
-database_id = "deepwork-db-id-placeholder"
+database_id = "a9b0b7f6-3fd5-43af-a522-28a9b1b651e1"
 migrations_dir = "migrations"
 
 [triggers]
