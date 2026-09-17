@@ -1,5 +1,36 @@
 import { Goal, Habit, QuestionnaireAnswers, ScheduleBlock, Task, WeeklyGoal } from '../types';
 
+export function extractTimeFromText(text: string): string | null {
+  if (!text) return null;
+  const atMatch = text.match(/(?:at|@)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (atMatch) {
+    let hours = parseInt(atMatch[1], 10);
+    const mins = atMatch[2] ? parseInt(atMatch[2], 10) : 0;
+    const meridian = atMatch[3] ? atMatch[3].toLowerCase() : null;
+
+    if (meridian === 'pm' && hours < 12) hours += 12;
+    if (meridian === 'am' && hours === 12) hours = 0;
+    if (hours >= 0 && hours < 24 && mins >= 0 && mins < 60) {
+      return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    }
+  }
+
+  const colonMatch = text.match(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\b/i);
+  if (colonMatch) {
+    let hours = parseInt(colonMatch[1], 10);
+    const mins = parseInt(colonMatch[2], 10);
+    const meridian = colonMatch[3] ? colonMatch[3].toLowerCase() : null;
+
+    if (meridian === 'pm' && hours < 12) hours += 12;
+    if (meridian === 'am' && hours === 12) hours = 0;
+    if (hours >= 0 && hours < 24 && mins >= 0 && mins < 60) {
+      return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    }
+  }
+
+  return null;
+}
+
 export async function generateScheduleWithGemini(
   tasks: Task[],
   goals: Goal[],
@@ -69,6 +100,9 @@ export async function generateScheduleWithGemini(
       }
       deduplicatedBlocks.push(b);
     }
+
+    // Sort chronologically by start_time
+    deduplicatedBlocks.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
 
     return { blocks: deduplicatedBlocks, rawText: jsonText };
   } catch (err: any) {
@@ -140,20 +174,23 @@ ${JSON.stringify(selectedLongTermGoals.map(g => {
 
 3. DAILY TASKS & TO-DOS (Explicitly organized into Morning, Afternoon, and Evening buckets):
 ${JSON.stringify([
-  ...selectedTasks.map(t => ({
-    id: t.id as string | null,
-    title: t.title,
-    time_bucket: t.column_bucket === 'now' ? 'Morning' : t.column_bucket === 'up_next' ? 'Afternoon' : 'Evening',
-    scheduled_time: t.scheduled_start || null,
-    duration_minutes: t.duration_minutes === 0 ? 'untimed / meeting / call' : t.duration_minutes,
-    priority: t.priority,
-    energy: t.energy_level
-  })),
+  ...selectedTasks.map(t => {
+    const detectedTime = t.scheduled_start || extractTimeFromText(t.title);
+    return {
+      id: t.id as string | null,
+      title: t.title,
+      time_bucket: t.column_bucket === 'now' ? 'Morning' : t.column_bucket === 'up_next' ? 'Afternoon' : 'Evening',
+      scheduled_time: detectedTime || null,
+      duration_minutes: t.duration_minutes === 0 ? 'untimed / meeting / call' : t.duration_minutes,
+      priority: t.priority,
+      energy: t.energy_level
+    };
+  }),
   ...(answers.morning_todos || []).map(td => ({
     id: null as string | null,
     title: td.title,
     time_bucket: 'Morning',
-    scheduled_time: null,
+    scheduled_time: extractTimeFromText(td.title) || null,
     duration_minutes: td.duration_minutes || 20,
     priority: 'MEDIUM' as const,
     energy: 'light' as const
@@ -172,11 +209,14 @@ QUESTIONNAIRE RESPONSES:
 - Style preference: "${answers.focus_preference || 'Deep work early, lighter review later'}"
 
 SCHEDULING RULES:
-1. STRICT TIMEFRAME BOUNDARIES (MANDATORY):
-   - The entire timetable MUST start strictly at ${answers.work_start_time || '09:00'}.
-   - ALL tasks, long-term goals, habits, and breaks MUST strictly conclude at or before ${answers.work_end_time || '17:00'}.
-   - NEVER schedule any block before ${answers.work_start_time || '09:00'} or after ${answers.work_end_time || '17:00'}.
-2. FIXED ANCHORS: Any task with a scheduled_time (e.g. meetings, calls, appointments) or mentioned in fixed commitments MUST be locked to that exact start time.
+1. WORKDAY TIMEFRAME BOUNDARIES (FOR FLEXIBLE WORK & DAYTIME HABITS):
+   - The core workday begins at ${answers.work_start_time || '09:00'}.
+   - ALL flexible work tasks, long-term roadmap study goals, daytime habits, and work breaks MUST strictly conclude at or before ${answers.work_end_time || '17:00'}.
+   - NEVER schedule flexible work blocks outside ${answers.work_start_time || '09:00'} to ${answers.work_end_time || '17:00'}.
+2. TIME-SPECIFIC COMMITMENTS & EVENTS (MANDATORY, INCLUDING OUTSIDE WORK HOURS):
+   - Any task with a scheduled_time (e.g. "20:00", meetings, appointments, calls, dinner, party at 8:00pm, evening events, early morning workouts) or mentioned in fixed commitments MUST be scheduled at that exact designated start time.
+   - CRITICAL: If a task has an explicit scheduled_time outside core working hours (e.g. "Party at 8:00pm" / 20:00, or a 07:00 workout), YOU MUST SCHEDULE IT on the daily timetable at that exact hour anywhere within the user's active waking day (${answers.wake_time} to ${answers.sleep_time}). Do NOT omit, discard, or clamp time-specific events into work hours!
+   - Mark outside-work-hours evening social/personal events with category="Personal & Social" and appropriate reasoning.
 3. NO DUPLICATES: Every task, habit, and to-do must appear at most once in the timetable. Never schedule the same item twice.
 4. CHRONOLOGICAL TIME-OF-DAY BUCKET CONTRACT:
    - MORNING WINDOW (${answers.work_start_time || '09:00'} → ${answers.lunch_start_time || '13:00'}):
@@ -186,17 +226,20 @@ SCHEDULING RULES:
      - Insert a protected "Lunch & recharge" break (block_source="break", category="Rest & Hydration").
    - AFTERNOON WINDOW (Lunch End → Late Afternoon):
      - Reserved for tasks in the 'Afternoon' bucket (calls, meetings, outreach, action items).
-   - EVENING WINDOW (Late Afternoon → ${answers.work_end_time || '17:00'}):
-     - Reserved for tasks in the 'Evening' bucket (wrap-up items, review, commits).
+   - EVENING WINDOW (Late Afternoon → ${answers.work_end_time || '17:00'}, PLUS any fixed evening commitments at their exact time):
+     - Work tasks in the 'Evening' bucket must wrap up before ${answers.work_end_time || '17:00'}.
+     - Any fixed evening events (e.g. party, social dinner) are placed at their exact designated start time (e.g. 20:00).
 5. INTERLEAVE LONG-TERM GOALS (DO NOT CLUSTER SEQUENTIALLY):
    - Do NOT cluster long-term roadmap goals back-to-back in a single rigid block.
    - Interleave and distribute long-term roadmap goals flexibly among the daily tasks within the workday timeframe (for example, 1 goal block in the morning alternating with a morning task, and 1 goal block in the afternoon alternating with an afternoon task).
-6. HARD CEILING AT ${answers.work_end_time || '17:00'}:
-   - If the total duration of selected work exceeds the available capacity between ${answers.work_start_time || '09:00'} and ${answers.work_end_time || '17:00'}, prioritize highest-priority items and omit lower-priority overflow tasks so the schedule strictly ends at or before ${answers.work_end_time || '17:00'}.
+6. HARD CEILING AT ${answers.work_end_time || '17:00'} FOR FLEXIBLE WORK:
+   - Flexible work and study tasks must never overflow past ${answers.work_end_time || '17:00'}. Only fixed-time commitments with explicit scheduled_time can be placed after ${answers.work_end_time || '17:00'}.
 7. HABIT RULES: 
    - Only schedule habits on the hourly timetable if they are TIMED focus sessions (e.g. "Morning planning", "Daily Review" where type='timed' and duration > 0).
    - Do NOT insert check-off milestones ("Wake up early") or all-day metric targets ("Drink 3L Water", "Walk 10,000+ Steps") as work blocks on the timetable—those are managed in the dedicated Daily Anchors panel.
-8. ZERO OVERLAPS: Ensure no two blocks overlap in time. Each block's start_time must be greater than or equal to the previous block's end_time.
+8. ZERO OVERLAPS & CHRONOLOGICAL ORDER:
+   - Ensure no two blocks overlap in time. Each block's start_time must be greater than or equal to the previous block's end_time.
+   - Return blocks in ascending chronological sequence.
 9. UNTIMED TASKS: For untimed tasks (duration 0, meetings, calls, errands), schedule them with "is_untimed": true and "target_label": "⚡ Action item" or "🕒 HH:MM".
 10. RECHARGE BREAKS: Insert 10-15 minute "Step away & recharge" breaks between deep work sessions.
 11. ASSIGN TASK IDs: For any block created from an existing task in the list, set "task_id" to that task's id; otherwise set null.
@@ -294,9 +337,9 @@ export function generateSmartFallbackSchedule(
     ? tasks.filter(t => answers.selected_task_ids!.includes(t.id))
     : tasks;
 
-  // Separate tasks into fixed scheduled vs buckets
-  const fixedTasks = eligibleTasks.filter(t => t.scheduled_start);
-  const unfixedTasks = eligibleTasks.filter(t => !t.scheduled_start);
+  // Separate tasks into fixed scheduled vs buckets (supporting explicit scheduled_start and times in title)
+  const fixedTasks = eligibleTasks.filter(t => Boolean(t.scheduled_start || extractTimeFromText(t.title)));
+  const unfixedTasks = eligibleTasks.filter(t => !t.scheduled_start && !extractTimeFromText(t.title));
 
   const morningTasks = unfixedTasks.filter(t => t.column_bucket === 'now');
   const afternoonTasks = unfixedTasks.filter(t => t.column_bucket === 'up_next');
@@ -315,11 +358,65 @@ export function generateSmartFallbackSchedule(
     return { ltg, selectedTopic, ltgTitle, dur, energyType };
   });
 
+  // 1. Build fixed commitments (anchors both inside and outside core workday window)
+  const scheduledFixedBlocks: ScheduleBlock[] = [];
+  for (const ft of fixedTasks) {
+    if (scheduledTitles.has(ft.title.toLowerCase().trim())) continue;
+    const timeStr = ft.scheduled_start || extractTimeFromText(ft.title) || '';
+    const fStart = parseTime(timeStr, workStartMin);
+    const isUntimed = ft.duration_minutes === 0;
+    const fDur = isUntimed ? 30 : (ft.duration_minutes > 0 ? ft.duration_minutes : 60);
+    const fEnd = fStart + fDur;
+
+    if (fStart >= 0 && fEnd <= 24 * 60) {
+      const isOutsideWork = fStart >= workEndMin || fEnd <= workStartMin;
+      scheduledFixedBlocks.push({
+        id: `block-fixed-${ft.id}`,
+        task_id: ft.id,
+        title: ft.title,
+        start_time: formatTime(fStart),
+        end_time: formatTime(fEnd),
+        duration: fDur,
+        type: ft.energy_level || 'light',
+        block_source: 'daily_todo',
+        category: ft.category && ft.category !== 'General'
+          ? ft.category
+          : (fStart >= workEndMin ? 'Personal & Social' : 'Fixed Commitment'),
+        status: 'pending',
+        reasoning: isOutsideWork
+          ? (fStart >= workEndMin
+            ? 'Evening personal commitment scheduled at designated time outside work hours.'
+            : 'Early morning commitment scheduled at designated time before workday start.')
+          : 'Fixed schedule anchor locked to designated start time.',
+        target_label: isUntimed ? `🕒 ${timeStr}` : undefined,
+        is_untimed: isUntimed
+      });
+      scheduledTitles.add(ft.title.toLowerCase().trim());
+    }
+  }
+
   // START STRICTLY AT workStartMin (e.g. 09:00 AM)
   let currentMinutes = workStartMin;
 
+  function advancePastWorkdayFixed(fromMin: number, neededDur: number): number {
+    let cur = fromMin;
+    for (const fb of scheduledFixedBlocks) {
+      const fbStart = parseTime(fb.start_time, 0);
+      const fbEnd = parseTime(fb.end_time, 0);
+      if (fbStart >= workStartMin && fbStart < workEndMin) {
+        if (cur >= fbStart && cur < fbEnd) {
+          cur = fbEnd;
+        } else if (cur < fbStart && cur + neededDur > fbStart) {
+          cur = fbEnd;
+        }
+      }
+    }
+    return cur;
+  }
+
   function canFit(duration: number): boolean {
-    return currentMinutes + duration <= workEndMin;
+    const nextStart = advancePastWorkdayFixed(currentMinutes, duration);
+    return nextStart + duration <= workEndMin;
   }
 
   // --- MORNING PHASE (workStartMin → Lunch) ---
@@ -702,39 +799,14 @@ export function generateSmartFallbackSchedule(
     }
   }
 
-  // Fixed tasks (locked to their scheduled_start within work window)
-  for (const ft of fixedTasks) {
-    if (scheduledTitles.has(ft.title.toLowerCase().trim())) continue;
-    const fStart = parseTime(ft.scheduled_start || '', workStartMin);
-    const isUntimed = ft.duration_minutes === 0;
-    const fDur = isUntimed ? 30 : ft.duration_minutes;
-    const fEnd = fStart + fDur;
+  // Merge flexible workday blocks with fixed blocks (both daytime anchors and outside-work commitments)
+  const allBlocks = [...blocks, ...scheduledFixedBlocks];
 
-    if (fStart >= workStartMin && fEnd <= workEndMin) {
-      blocks.push({
-        id: `block-${blocks.length + 1}`,
-        task_id: ft.id,
-        title: ft.title,
-        start_time: formatTime(fStart),
-        end_time: formatTime(fEnd),
-        duration: fDur,
-        type: 'light',
-        block_source: 'daily_todo',
-        category: ft.category || 'Fixed Commitment',
-        status: 'pending',
-        reasoning: 'Fixed schedule anchor locked to designated start time.',
-        target_label: isUntimed ? `🕒 ${ft.scheduled_start}` : undefined,
-        is_untimed: isUntimed
-      });
-      scheduledTitles.add(ft.title.toLowerCase().trim());
-    }
-  }
-
-  // Sort blocks by start_time so timetable flows chronologically
-  blocks.sort((a, b) => a.start_time.localeCompare(b.start_time));
+  // Sort blocks by start_time so timetable flows strictly chronologically
+  allBlocks.sort((a, b) => a.start_time.localeCompare(b.start_time));
 
   // Re-index IDs sequentially
-  return blocks.map((b, idx) => ({
+  return allBlocks.map((b, idx) => ({
     ...b,
     id: `block-${idx + 1}`
   }));

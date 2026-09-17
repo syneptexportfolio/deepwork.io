@@ -15,6 +15,37 @@ export interface Task {
   created_at: string;
 }
 
+export function extractTimeFromText(text: string): string | null {
+  if (!text) return null;
+  const atMatch = text.match(/(?:at|@)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (atMatch) {
+    let hours = parseInt(atMatch[1], 10);
+    const mins = atMatch[2] ? parseInt(atMatch[2], 10) : 0;
+    const meridian = atMatch[3] ? atMatch[3].toLowerCase() : null;
+
+    if (meridian === 'pm' && hours < 12) hours += 12;
+    if (meridian === 'am' && hours === 12) hours = 0;
+    if (hours >= 0 && hours < 24 && mins >= 0 && mins < 60) {
+      return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    }
+  }
+
+  const colonMatch = text.match(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\b/i);
+  if (colonMatch) {
+    let hours = parseInt(colonMatch[1], 10);
+    const mins = parseInt(colonMatch[2], 10);
+    const meridian = colonMatch[3] ? colonMatch[3].toLowerCase() : null;
+
+    if (meridian === 'pm' && hours < 12) hours += 12;
+    if (meridian === 'am' && hours === 12) hours = 0;
+    if (hours >= 0 && hours < 24 && mins >= 0 && mins < 60) {
+      return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    }
+  }
+
+  return null;
+}
+
 export type HabitType = 'timed' | 'check_off' | 'target';
 export type FrequencyType = 'days' | 'interval' | 'weekly_target';
 

@@ -383,6 +383,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
               {activeDaySchedule.map((item) => {
                 const isDone = item.status === 'done';
                 const isBreak = item.type === 'break';
+                const isSocial = item.category === 'Personal & Social' || item.category === 'Social';
                 const isCurrentlyActive = isSelectedToday && isTimeWithinBlock(currentHHMM, item.start_time, item.end_time);
 
                 // Dot colors
@@ -390,6 +391,8 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                   ? 'border-luma-lime bg-luma-lime shadow-[0_0_12px_#d4f938]'
                   : isBreak
                   ? 'border-[#d9822b] bg-[#342014]'
+                  : isSocial
+                  ? 'border-pink-500 bg-[#35152a] shadow-[0_0_8px_rgba(236,72,153,0.3)]'
                   : isDone
                   ? 'border-luma-lime bg-luma-lime'
                   : 'border-luma-purple bg-luma-purple-dim';
@@ -399,6 +402,8 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                   ? 'bg-[#1b2618] border-l-4 border-l-luma-lime border-y-white/10 border-r-white/10 shadow-[0_0_20px_rgba(212,249,56,0.16)] text-white'
                   : isBreak
                   ? 'bg-[#291a13] border-[#442b1f] text-[#f7ad72]'
+                  : isSocial
+                  ? 'bg-[#251522] border-[#4a203f] text-[#f9a8d4]'
                   : isDone
                   ? 'bg-[#1b221a] border-[#293627] text-white opacity-80'
                   : 'bg-[#211e38] border-[#342f59] text-white';
@@ -407,6 +412,8 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                   ? 'text-luma-lime font-bold'
                   : isBreak
                   ? 'text-[#e6934c]'
+                  : isSocial
+                  ? 'text-pink-400'
                   : isDone
                   ? 'text-luma-lime'
                   : 'text-luma-purple';
@@ -447,26 +454,27 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                             ACTIVE NOW
                           </span>
                         )}
-                        {item.block_source === 'habit' && (
+                        {isSocial ? (
+                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-300 border border-pink-500/30">
+                            🎉 SOCIAL / EVENING
+                          </span>
+                        ) : item.block_source === 'habit' ? (
                           <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-luma-purple-dim text-luma-purple border border-luma-purple/30">
                             HABIT
                           </span>
-                        )}
-                        {item.block_source === 'weekly_goal' && (
+                        ) : item.block_source === 'weekly_goal' ? (
                           <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#242b10] text-luma-lime border border-luma-lime/30">
                             WEEKLY GOAL
                           </span>
-                        )}
-                        {item.block_source === 'long_term_goal' && (
+                        ) : item.block_source === 'long_term_goal' ? (
                           <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#1b2535] text-[#60a5fa] border border-[#60a5fa]/30">
                             LONG-TERM GOAL
                           </span>
-                        )}
-                        {item.block_source === 'daily_todo' && (
+                        ) : item.block_source === 'daily_todo' ? (
                           <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-luma-text-muted border border-white/10">
                             TO-DO
                           </span>
-                        )}
+                        ) : null}
                       </div>
 
                       {item.target_label ? (

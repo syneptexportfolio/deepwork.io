@@ -13,7 +13,7 @@ import {
   Minus,
   Plus,
 } from 'lucide-react';
-import { Task } from '../../services/api';
+import { Task, extractTimeFromText } from '../../services/api';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -28,6 +28,7 @@ const CATEGORIES = [
   { id: 'Business', label: 'Job & Business', icon: Briefcase },
   { id: 'Study', label: 'Exam & Study', icon: GraduationCap },
   { id: 'Fitness', label: 'Health & Fitness', icon: Activity },
+  { id: 'Personal & Social', label: 'Personal & Social', icon: Sparkles },
   { id: 'Personal', label: 'Personal & Admin', icon: Zap },
 ];
 
@@ -181,14 +182,26 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
     setLoading(true);
     try {
+      const detected = !scheduledStart ? extractTimeFromText(title.trim()) : null;
+      const finalScheduledStart = scheduledStart || detected || null;
+      let finalCategory = category.trim() || 'General';
+      let finalBucket = columnBucket;
+      let finalEnergy = energyLevel;
+
+      if (finalScheduledStart && finalScheduledStart >= '17:00') {
+        if (finalCategory === 'Project' || finalCategory === 'General') finalCategory = 'Personal & Social';
+        if (finalBucket === 'now') finalBucket = 'later';
+        if (finalEnergy === 'deep_focus') finalEnergy = 'light';
+      }
+
       await onSave({
         title: title.trim(),
         duration_minutes: isUntimed ? 0 : Math.max(0, duration),
         priority,
-        energy_level: energyLevel,
-        category: category.trim() || 'General',
-        column_bucket: columnBucket,
-        scheduled_start: scheduledStart || null,
+        energy_level: finalEnergy,
+        category: finalCategory,
+        column_bucket: finalBucket,
+        scheduled_start: finalScheduledStart,
       });
       onClose();
     } finally {
@@ -269,8 +282,21 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 type="text"
                 required
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Client zoom meeting, call accountant, ship feature module"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setTitle(val);
+                  if (!scheduledStart) {
+                    const detected = extractTimeFromText(val);
+                    if (detected) {
+                      setScheduledStart(detected);
+                      if (detected >= '17:00') {
+                        setColumnBucket('later');
+                        setCategory('Personal & Social');
+                      }
+                    }
+                  }
+                }}
+                placeholder="e.g. Party at 8:00pm, client meeting at 11am, ship feature module"
                 className="w-full bg-[#1b1c1b] border border-luma-card-border rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-luma-lime transition-colors"
               />
             </div>

@@ -4,7 +4,7 @@ import {
   Target, AlertCircle, CheckCircle2, Layers, Briefcase, Coffee, Compass,
   BookOpen, Flame
 } from 'lucide-react';
-import { Habit, QuestionnaireAnswers, Task, WeeklyGoal, Goal, LongTermGoalDailyConfig } from '../../services/api';
+import { Habit, QuestionnaireAnswers, Task, WeeklyGoal, Goal, LongTermGoalDailyConfig, extractTimeFromText } from '../../services/api';
 
 export interface GoalDailyConfigState {
   topicId: string;
@@ -187,9 +187,9 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
   // Tab state for Section 3
   const [activeTab, setActiveTab] = useState<'tasks' | 'habits' | 'long_term_goals' | 'todos'>('tasks');
 
-  // Auto-detect fixed commitments (tasks with scheduled_start)
+  // Auto-detect fixed commitments (tasks with scheduled_start or time in title)
   const detectedAnchors = useMemo(() => {
-    return tasks.filter(t => t.scheduled_start && t.status === 'pending');
+    return tasks.filter(t => (t.scheduled_start || extractTimeFromText(t.title)) && t.status === 'pending');
   }, [tasks]);
 
   // Initial setup when modal opens
@@ -234,7 +234,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
 
       // 5. Intelligent default for fixed commitments if detected anchors exist
       if (!commitments && detectedAnchors.length > 0) {
-        setCommitments(detectedAnchors.map(a => `${a.title} at ${a.scheduled_start}`).join(', '));
+        setCommitments(detectedAnchors.map(a => `${a.title} at ${a.scheduled_start || extractTimeFromText(a.title)}`).join(', '));
       }
 
       // 6. Load saved work hours preference if available
@@ -757,7 +757,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#24261f] border border-amber-500/30 text-amber-300 text-[11px] font-mono"
                       >
                         <Clock className="w-3 h-3 text-amber-400" />
-                        <span>{a.scheduled_start}</span>
+                        <span>{a.scheduled_start || extractTimeFromText(a.title)}</span>
                         <span className="text-white font-sans truncate max-w-[140px]">{a.title}</span>
                       </span>
                     ))}
@@ -944,9 +944,9 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                                   <span className="truncate font-medium">{t.title}</span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 font-mono text-[10px]">
-                                  {t.scheduled_start && (
+                                  {(t.scheduled_start || extractTimeFromText(t.title)) && (
                                     <span className="px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-500/20">
-                                      🕒 {t.scheduled_start}
+                                      🕒 {t.scheduled_start || extractTimeFromText(t.title)}
                                     </span>
                                   )}
                                   <span className="text-luma-text-dim">
@@ -994,9 +994,9 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                                   <span className="truncate font-medium">{t.title}</span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 font-mono text-[10px]">
-                                  {t.scheduled_start && (
+                                  {(t.scheduled_start || extractTimeFromText(t.title)) && (
                                     <span className="px-1.5 py-0.5 rounded bg-sky-400/10 text-sky-300 border border-sky-500/20">
-                                      🕒 {t.scheduled_start}
+                                      🕒 {t.scheduled_start || extractTimeFromText(t.title)}
                                     </span>
                                   )}
                                   <span className="text-luma-text-dim">
@@ -1044,9 +1044,9 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                                   <span className="truncate font-medium">{t.title}</span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 font-mono text-[10px]">
-                                  {t.scheduled_start && (
+                                  {(t.scheduled_start || extractTimeFromText(t.title)) && (
                                     <span className="px-1.5 py-0.5 rounded bg-purple-400/10 text-purple-300 border border-purple-500/20">
-                                      🕒 {t.scheduled_start}
+                                      🕒 {t.scheduled_start || extractTimeFromText(t.title)}
                                     </span>
                                   )}
                                   <span className="text-luma-text-dim">

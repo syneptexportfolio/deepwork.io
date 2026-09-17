@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { Env, Task } from '../types';
 import { getTodayIST, pruneOrResetSchedule } from './schedule';
+import { extractTimeFromText } from '../services/llm';
 
 export const tasksRouter = new Hono<{ Bindings: Env }>();
 
@@ -36,21 +37,28 @@ tasksRouter.post('/', async (c) => {
   try {
     const body = await c.req.json();
     const id = body.id || `task-${Date.now()}`;
-    const title = body.title;
+    const title = body.title ? body.title.trim() : '';
     if (!title) {
       return c.json({ success: false, error: 'Task title is required' }, 400);
+    }
+
+    const detectedTime = extractTimeFromText(title);
+    const scheduled_start = body.scheduled_start || detectedTime || null;
+    const scheduled_end = body.scheduled_end || null;
+    let category = body.category || 'General';
+    let column_bucket = body.column_bucket || 'now';
+
+    if (scheduled_start && scheduled_start >= '17:00') {
+      if (category === 'General') category = 'Personal & Social';
+      if (column_bucket === 'now') column_bucket = 'later';
     }
 
     const type = body.type || 'daily';
     const duration_minutes = body.duration_minutes !== undefined ? Number(body.duration_minutes) : 30;
     const priority = body.priority || 'MEDIUM';
-    const energy_level = body.energy_level || 'deep_focus';
+    const energy_level = body.energy_level || (scheduled_start && scheduled_start >= '17:00' ? 'light' : 'deep_focus');
     const status = body.status || 'pending';
-    const scheduled_start = body.scheduled_start || null;
-    const scheduled_end = body.scheduled_end || null;
-    const category = body.category || 'General';
     const goal_id = body.goal_id || null;
-    const column_bucket = body.column_bucket || 'now';
     const task_date = body.task_date || getTodayIST();
 
     await c.env.DB.prepare(
@@ -80,16 +88,23 @@ tasksRouter.patch('/:id', async (c) => {
     }
 
     const title = body.title !== undefined ? body.title : current.title;
+    const detectedTime = extractTimeFromText(title);
     const type = body.type !== undefined ? body.type : current.type;
     const duration_minutes = body.duration_minutes !== undefined ? body.duration_minutes : current.duration_minutes;
     const priority = body.priority !== undefined ? body.priority : current.priority;
     const energy_level = body.energy_level !== undefined ? body.energy_level : current.energy_level;
     const status = body.status !== undefined ? body.status : current.status;
-    const scheduled_start = body.scheduled_start !== undefined ? body.scheduled_start : current.scheduled_start;
+    const scheduled_start = body.scheduled_start !== undefined ? body.scheduled_start : (detectedTime || current.scheduled_start);
     const scheduled_end = body.scheduled_end !== undefined ? body.scheduled_end : current.scheduled_end;
-    const category = body.category !== undefined ? body.category : current.category;
+    let category = body.category !== undefined ? body.category : current.category;
+    let column_bucket = body.column_bucket !== undefined ? body.column_bucket : current.column_bucket;
+
+    if (scheduled_start && scheduled_start >= '17:00') {
+      if (category === 'General') category = 'Personal & Social';
+      if (column_bucket === 'now' && body.column_bucket === undefined) column_bucket = 'later';
+    }
+
     const goal_id = body.goal_id !== undefined ? body.goal_id : current.goal_id;
-    const column_bucket = body.column_bucket !== undefined ? body.column_bucket : current.column_bucket;
     const task_date = body.task_date !== undefined ? body.task_date : current.task_date;
 
     await c.env.DB.prepare(
