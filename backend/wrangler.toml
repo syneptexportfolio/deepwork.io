@@ -16,7 +16,7 @@ crons = ["*/5 * * * *"]
 
 [vars]
 ENVIRONMENT = "development"
-DEFAULT_LEAD_TIME_MINUTES = "10"
+DEFAULT_LEAD_TIME_MINUTES = "5"
 GEMINI_MODEL = "gemini-1.5-flash"
 ALLOWED_ORIGIN = "*"
 

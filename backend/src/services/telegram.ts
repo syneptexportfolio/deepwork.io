@@ -34,15 +34,46 @@ export async function sendTelegramMessage(
   }
 }
 
+export function formatBlockReminder(
+  title: string,
+  startTime: string,
+  durationMinutes: number,
+  type?: string,
+  category?: string | null
+): string {
+  const normTitle = (title || '').toLowerCase();
+  const isLunch = type === 'break' && (normTitle.includes('lunch') || normTitle.includes('meal') || normTitle.includes('food'));
+  const isBreak = type === 'break' && !isLunch;
+
+  if (isLunch) {
+    return `🍱 <b>Luma Midday Break in 5 mins</b>\n\n` +
+           `🍽️ <b>${title}</b>\n` +
+           `⏰ Starts at <b>${startTime}</b> (${durationMinutes} mins)\n\n` +
+           `<i>"Step away from your screen, nourish your body, and rest."</i>`;
+  }
+
+  if (isBreak) {
+    return `☕ <b>Luma Recovery Break in 5 mins</b>\n\n` +
+           `🌿 <b>${title}</b>\n` +
+           `⏰ Starts at <b>${startTime}</b> (${durationMinutes} mins)\n\n` +
+           `<i>"Rest your eyes, hydrate, and consolidate your focus."</i>`;
+  }
+
+  const cat = category ? ` • <i>${category}</i>` : '';
+  const icon = type === 'deep_focus' ? '⚡' : '🎯';
+  const label = type === 'deep_focus' ? 'Deep Focus Session' : 'Scheduled Commitment';
+
+  return `${icon} <b>Luma ${label} in 5 mins</b>\n\n` +
+         `🎯 <b>${title}</b>${cat}\n` +
+         `⏰ Starts at <b>${startTime}</b> (${durationMinutes} mins)\n\n` +
+         `<i>"One clear commitment at a time. Protect your rhythm."</i>`;
+}
+
 export function formatTaskReminder(
   taskTitle: string,
   startTime: string,
   durationMinutes: number,
   category?: string | null
 ): string {
-  const cat = category ? ` • <i>${category}</i>` : '';
-  return `⚡ <b>Luma Focus Reminder</b>\n\n` +
-         `🎯 <b>${taskTitle}</b>${cat}\n` +
-         `⏰ Starting at <b>${startTime}</b> (${durationMinutes} mins)\n\n` +
-         `<i>"One clear commitment at a time. Protect your rhythm."</i>`;
+  return formatBlockReminder(taskTitle, startTime, durationMinutes, 'task', category);
 }

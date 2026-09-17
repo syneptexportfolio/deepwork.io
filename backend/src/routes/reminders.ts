@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { Env, Task } from '../types';
-import { formatTaskReminder, sendTelegramMessage } from '../services/telegram';
+import { formatBlockReminder, formatTaskReminder, sendTelegramMessage } from '../services/telegram';
 
 export const remindersRouter = new Hono<{ Bindings: Env }>();
 
@@ -11,7 +11,7 @@ export async function checkAndSendReminders(env: Env): Promise<{
 }> {
   const token = env.TELEGRAM_BOT_TOKEN;
   const chatId = env.TELEGRAM_CHAT_ID;
-  const leadMinutes = parseInt(env.DEFAULT_LEAD_TIME_MINUTES || '10', 10);
+  const leadMinutes = parseInt(env.DEFAULT_LEAD_TIME_MINUTES || '5', 10);
 
   // Get current date & time in IST (UTC+5:30)
   const now = new Date();
@@ -26,6 +26,7 @@ export async function checkAndSendReminders(env: Env): Promise<{
     title: string;
     startTime: string;
     durationMinutes: number;
+    type?: string;
     category?: string | null;
   }
 
@@ -43,12 +44,13 @@ export async function checkAndSendReminders(env: Env): Promise<{
         title: t.title,
         startTime: t.scheduled_start,
         durationMinutes: t.duration_minutes || 30,
+        type: t.energy_level || 'light',
         category: t.category
       });
     }
   }
 
-  // 2. Check today's AI-generated schedule timetable
+  // 2. Check today's schedule timetable (including tasks, long-term goals, habits, rest breaks, and lunch)
   try {
     const schedRow = await env.DB.prepare(
       'SELECT generated_plan FROM schedules WHERE date = ?'
@@ -57,14 +59,16 @@ export async function checkAndSendReminders(env: Env): Promise<{
     if (schedRow && schedRow.generated_plan) {
       const blocks: any[] = JSON.parse(schedRow.generated_plan);
       for (const b of blocks) {
-        if (b.status === 'pending' && b.type !== 'break' && b.start_time) {
-          const id = b.task_id || b.id;
+        if (b.start_time && b.status !== 'done') {
+          // Unique ID for each block (including lunch and rest breaks)
+          const id = b.task_id || b.id || `sched-${todayIST}-${b.start_time}`;
           if (!candidateMap.has(id)) {
             candidateMap.set(id, {
               id,
               title: b.title,
               startTime: b.start_time,
               durationMinutes: b.duration || 30,
+              type: b.type,
               category: b.category
             });
           }
@@ -85,7 +89,7 @@ export async function checkAndSendReminders(env: Env): Promise<{
     if (parts.length < 2) continue;
     const itemStartMinutes = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
 
-    // Check if task starts between now and (now + leadMinutes)
+    // Check if item starts between now and (now + leadMinutes)
     const diffMinutes = itemStartMinutes - currentMinutes;
 
     if (diffMinutes >= 0 && diffMinutes <= leadMinutes) {
@@ -105,7 +109,7 @@ export async function checkAndSendReminders(env: Env): Promise<{
           continue;
         }
 
-        const msg = formatTaskReminder(item.title, item.startTime, item.durationMinutes, item.category);
+        const msg = formatBlockReminder(item.title, item.startTime, item.durationMinutes, item.type, item.category);
         const sendRes = await sendTelegramMessage(token, chatId, msg);
 
         if (sendRes.success) {

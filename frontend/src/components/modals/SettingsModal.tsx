@@ -151,7 +151,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </span>
             </div>
             <p className="text-xs text-luma-text-muted mb-4">
-              Sends an automated reminder message 10 minutes before any scheduled task.
+              Sends an automated reminder message 5 minutes before each scheduled timeline block, including tasks, goals, rest, and lunch.
             </p>
 
             <div className="space-y-3">
