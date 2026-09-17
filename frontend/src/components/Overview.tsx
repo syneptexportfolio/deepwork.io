@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Sparkles,
   CheckCircle2,
-  Circle,
   Clock,
   Flame,
   Target,
@@ -11,7 +10,6 @@ import {
   Plus,
   ArrowUpRight,
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import {
   Goal,
   Habit,
@@ -22,8 +20,6 @@ import {
   WeekDaySchedule,
   api,
 } from '../services/api';
-import { getCategoryBadge } from './LearningPaths';
-import { normalizeHabitDays, WEEK_DAYS_CONFIG } from './modals/HabitModal';
 
 interface OverviewProps {
   schedule: ScheduleBlock[];
@@ -43,22 +39,348 @@ interface OverviewProps {
   onIncrementWeeklyGoal?: (id: string, currentCompleted: number) => Promise<void>;
 }
 
+interface PointItem {
+  day: number;
+  date: string;
+  points: number;
+  maxPoints?: number;
+  totalTasks?: number;
+  percentage: number;
+}
+
+interface MonthlyPointsLineChartProps {
+  title: string;
+  subtitle: string;
+  badgeLabel: string;
+  colorScheme: 'lime' | 'purple';
+  points: PointItem[];
+  maxY: number;
+  yUnitLabel: string;
+  isLoading?: boolean;
+}
+
+function getSmoothSvgPath(coords: { x: number; y: number }[]): string {
+  if (coords.length === 0) return '';
+  if (coords.length === 1) return `M ${coords[0].x} ${coords[0].y}`;
+  let d = `M ${coords[0].x.toFixed(1)} ${coords[0].y.toFixed(1)}`;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p0 = coords[i === 0 ? i : i - 1];
+    const p1 = coords[i];
+    const p2 = coords[i + 1];
+    const p3 = coords[i + 2] || p2;
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
+const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
+  title,
+  subtitle,
+  badgeLabel,
+  colorScheme,
+  points,
+  maxY,
+  yUnitLabel,
+  isLoading = false,
+}) => {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  const totalScored = useMemo(() => {
+    return points.reduce((sum, p) => sum + p.points, 0);
+  }, [points]);
+
+  const peakPoint = useMemo(() => {
+    if (points.length === 0) return null;
+    return points.reduce((max, p) => (p.points > max.points ? p : max), points[0]);
+  }, [points]);
+
+  const activeDaysWithPoints = useMemo(() => {
+    return points.filter((p) => p.points > 0).length;
+  }, [points]);
+
+  // SVG Dimensions
+  const svgWidth = 540;
+  const svgHeight = 210;
+  const paddingLeft = 36;
+  const paddingRight = 20;
+  const paddingTop = 20;
+  const paddingBottom = 34;
+  const graphW = svgWidth - paddingLeft - paddingRight;
+  const graphH = svgHeight - paddingTop - paddingBottom;
+
+  const validMaxY = Math.max(maxY, 1);
+
+  const coords = useMemo(() => {
+    if (points.length === 0) return [];
+    return points.map((p, idx) => {
+      const x = paddingLeft + (idx / Math.max(points.length - 1, 1)) * graphW;
+      const y = paddingTop + graphH - (p.points / validMaxY) * graphH;
+      return { x, y, point: p, index: idx };
+    });
+  }, [points, validMaxY, graphW, graphH]);
+
+  const linePath = useMemo(() => getSmoothSvgPath(coords), [coords]);
+  const areaPath = useMemo(() => {
+    if (coords.length === 0) return '';
+    const bottomY = paddingTop + graphH;
+    return `${linePath} L ${coords[coords.length - 1].x.toFixed(1)} ${bottomY} L ${coords[0].x.toFixed(1)} ${bottomY} Z`;
+  }, [linePath, coords, paddingTop, graphH]);
+
+  const isLime = colorScheme === 'lime';
+  const strokeColor = isLime ? '#d4f938' : '#a78bfa';
+  const glowColor = isLime ? 'rgba(212,249,56,0.5)' : 'rgba(167,139,250,0.5)';
+  const gradientId = isLime ? 'limeGraphGradient' : 'purpleGraphGradient';
+  const badgeClasses = isLime
+    ? 'text-luma-lime bg-luma-lime/10 border-luma-lime/20'
+    : 'text-luma-purple bg-luma-purple/10 border-luma-purple/20';
+
+  const hoveredItem = hoveredIndex !== null && coords[hoveredIndex] ? coords[hoveredIndex] : null;
+
+  // Key day ticks for X-axis
+  const dayTickIndices = useMemo(() => {
+    if (points.length === 0) return [];
+    const ticks = [0];
+    for (let d = 5; d < points.length; d += 5) {
+      ticks.push(d - 1);
+    }
+    if (!ticks.includes(points.length - 1)) {
+      ticks.push(points.length - 1);
+    }
+    return ticks;
+  }, [points]);
+
+  return (
+    <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 relative overflow-hidden shadow-md flex flex-col justify-between">
+      {/* Background radial highlight */}
+      <div
+        className={`absolute -top-12 -right-12 w-48 h-48 rounded-full blur-3xl pointer-events-none ${
+          isLime ? 'bg-luma-lime/5' : 'bg-luma-purple/5'
+        }`}
+      />
+
+      <div>
+        {/* Header */}
+        <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-[10px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${badgeClasses}`}>
+                {badgeLabel}
+              </span>
+            </div>
+            <h3 className="text-base font-semibold text-white tracking-tight">{title}</h3>
+            <p className="text-xs text-luma-text-muted mt-0.5">{subtitle}</p>
+          </div>
+
+          {/* Summary Metric Badges */}
+          <div className="flex items-center gap-3 text-right">
+            <div>
+              <div className="text-[10px] font-mono uppercase text-luma-text-dim">Total Scored</div>
+              <div className="text-base font-bold text-white font-mono">
+                {totalScored} <span className="text-xs font-normal text-luma-text-dim">{yUnitLabel}</span>
+              </div>
+            </div>
+            {peakPoint && peakPoint.points > 0 && (
+              <div className="hidden sm:block border-l border-white/10 pl-3">
+                <div className="text-[10px] font-mono uppercase text-luma-text-dim">Peak Day</div>
+                <div className={`text-base font-bold font-mono ${isLime ? 'text-luma-lime' : 'text-luma-purple'}`}>
+                  {peakPoint.points} <span className="text-xs font-normal text-luma-text-dim">(Day {peakPoint.day})</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Hover Highlight Status Banner */}
+        <div className="h-7 mb-2 flex items-center justify-between text-xs font-mono">
+          {hoveredItem ? (
+            <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white animate-fadeIn">
+              <span className={isLime ? 'text-luma-lime font-bold' : 'text-luma-purple font-bold'}>
+                Day {hoveredItem.point.day}
+              </span>
+              <span className="text-white/40">•</span>
+              <span className="text-luma-text-dim">{hoveredItem.point.date}</span>
+              <span className="text-white/40">•</span>
+              <span className="font-semibold text-white">
+                {hoveredItem.point.points} {yUnitLabel}
+                {hoveredItem.point.maxPoints !== undefined && (
+                  <span className="text-luma-text-dim font-normal"> / {hoveredItem.point.maxPoints}</span>
+                )}
+                {hoveredItem.point.totalTasks !== undefined && (
+                  <span className="text-luma-text-dim font-normal"> / {hoveredItem.point.totalTasks}</span>
+                )}
+              </span>
+              <span className="text-emerald-400 font-bold">({hoveredItem.point.percentage}%)</span>
+            </div>
+          ) : (
+            <span className="text-[11px] text-luma-text-dim italic">
+              Hover over points along the curve to inspect daily scores
+            </span>
+          )}
+
+          <div className="text-[10px] font-mono text-luma-text-dim">
+            Active: <span className="text-white font-medium">{activeDaysWithPoints}d</span>
+          </div>
+        </div>
+
+        {/* Chart SVG Canvas */}
+        <div className="relative w-full overflow-hidden rounded-2xl bg-[#141514] border border-white/[0.04] p-2">
+          {isLoading ? (
+            <div className="h-44 flex items-center justify-center text-xs font-mono text-luma-text-muted">
+              Loading monthly curve...
+            </div>
+          ) : points.length === 0 ? (
+            <div className="h-44 flex items-center justify-center text-xs font-mono text-luma-text-muted">
+              No points data recorded for this month
+            </div>
+          ) : (
+            <svg
+              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+              className="w-full h-auto overflow-visible select-none"
+            >
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={strokeColor} stopOpacity="0.25" />
+                  <stop offset="100%" stopColor={strokeColor} stopOpacity="0.0" />
+                </linearGradient>
+              </defs>
+
+              {/* Horizontal Gridlines */}
+              {[0, 0.5, 1].map((ratio) => {
+                const y = paddingTop + graphH - ratio * graphH;
+                const val = Math.round(ratio * validMaxY);
+                return (
+                  <g key={ratio}>
+                    <line
+                      x1={paddingLeft}
+                      y1={y}
+                      x2={svgWidth - paddingRight}
+                      y2={y}
+                      stroke="rgba(255,255,255,0.06)"
+                      strokeDasharray="3 3"
+                    />
+                    <text
+                      x={paddingLeft - 8}
+                      y={y + 3.5}
+                      textAnchor="end"
+                      fill="rgba(255,255,255,0.3)"
+                      fontSize="9"
+                      fontFamily="monospace"
+                    >
+                      {val}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* Area Fill */}
+              {areaPath && <path d={areaPath} fill={`url(#${gradientId})`} />}
+
+              {/* Glowing Line Curve */}
+              {linePath && (
+                <path
+                  d={linePath}
+                  fill="none"
+                  stroke={strokeColor}
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ filter: `drop-shadow(0 0 5px ${glowColor})` }}
+                />
+              )}
+
+              {/* Active Hover Guideline */}
+              {hoveredItem && (
+                <line
+                  x1={hoveredItem.x}
+                  y1={paddingTop}
+                  x2={hoveredItem.x}
+                  y2={paddingTop + graphH}
+                  stroke={strokeColor}
+                  strokeWidth="1"
+                  strokeDasharray="2 2"
+                  opacity="0.7"
+                />
+              )}
+
+              {/* Interactive Circles on Nodes */}
+              {coords.map((c) => {
+                const isHovered = hoveredIndex === c.index;
+                const hasScore = c.point.points > 0;
+                return (
+                  <g
+                    key={c.index}
+                    onMouseEnter={() => setHoveredIndex(c.index)}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                    className="cursor-pointer"
+                  >
+                    {/* Transparent larger hit target for smooth hover */}
+                    <circle cx={c.x} cy={c.y} r={10} fill="transparent" />
+
+                    {/* Visible point node */}
+                    <circle
+                      cx={c.x}
+                      cy={c.y}
+                      r={isHovered ? 5.5 : hasScore ? 3.5 : 2}
+                      fill={isHovered || hasScore ? strokeColor : '#252825'}
+                      stroke={isHovered ? '#ffffff' : hasScore ? '#141514' : 'rgba(255,255,255,0.1)'}
+                      strokeWidth={isHovered ? 2 : 1}
+                      style={
+                        hasScore || isHovered
+                          ? { filter: `drop-shadow(0 0 4px ${glowColor})` }
+                          : undefined
+                      }
+                      className="transition-all duration-150"
+                    />
+                  </g>
+                );
+              })}
+
+              {/* X-Axis Days Labels */}
+              {dayTickIndices.map((idx) => {
+                const c = coords[idx];
+                if (!c) return null;
+                return (
+                  <text
+                    key={idx}
+                    x={c.x}
+                    y={svgHeight - 10}
+                    textAnchor="middle"
+                    fill="rgba(255,255,255,0.4)"
+                    fontSize="9"
+                    fontFamily="monospace"
+                  >
+                    {c.point.day}
+                  </text>
+                );
+              })}
+            </svg>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const Overview: React.FC<OverviewProps> = ({
   schedule,
   habits = [],
-  goals = [],
+  goals: _goals = [],
   weeklyGoals = [],
   tasks: _tasks = [],
   stats: _stats,
   onSelectTab,
-  onSelectGoal,
+  onSelectGoal: _onSelectGoal,
   onSelectDay,
   onToggleScheduleStatus,
-  onToggleHabit,
+  onToggleHabit: _onToggleHabit,
   onOpenShapeMyDay,
   onAddTask,
   onAddWeeklyGoal,
-  onIncrementWeeklyGoal,
+  onIncrementWeeklyGoal: _onIncrementWeeklyGoal,
 }) => {
   // Live current time in HH:MM
   const [currentHHMM, setCurrentHHMM] = useState(() => {
@@ -91,8 +413,71 @@ export const Overview: React.FC<OverviewProps> = ({
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [weekOffset, setWeekOffset] = useState<number>(0);
 
-  // Month Selector for Habit Visualizer
-  const [selectedMonthOffset, setSelectedMonthOffset] = useState<number>(0);
+  // Month Selector for Dual Monthly Curves
+  const [selectedGraphMonth, setSelectedGraphMonth] = useState<string>(() => {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()).slice(0, 7);
+  });
+
+  const [habitPointsData, setHabitPointsData] = useState<{
+    totalHabits: number;
+    points: PointItem[];
+  } | null>(null);
+
+  const [taskPointsData, setTaskPointsData] = useState<{
+    points: PointItem[];
+  } | null>(null);
+
+  const [loadingPoints, setLoadingPoints] = useState(false);
+
+  // Load Habit & Task Monthly Points
+  useEffect(() => {
+    let isMounted = true;
+    setLoadingPoints(true);
+    Promise.all([
+      api.getMonthlyHabitPoints(selectedGraphMonth).catch(() => null),
+      api.getMonthlyTaskPoints(selectedGraphMonth).catch(() => null),
+    ]).then(([habitRes, taskRes]) => {
+      if (!isMounted) return;
+      if (habitRes && habitRes.success) {
+        setHabitPointsData({
+          totalHabits: habitRes.totalHabits,
+          points: habitRes.points,
+        });
+      }
+      if (taskRes && taskRes.success) {
+        setTaskPointsData({
+          points: taskRes.points,
+        });
+      }
+      setLoadingPoints(false);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedGraphMonth, habits, schedule]);
+
+  const graphMonthLabel = useMemo(() => {
+    const [y, m] = selectedGraphMonth.split('-').map(Number);
+    const d = new Date(y, m - 1, 1);
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }, [selectedGraphMonth]);
+
+  const handlePrevMonth = () => {
+    const [y, m] = selectedGraphMonth.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    setSelectedGraphMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const handleCurrentMonth = () => {
+    const now = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()).slice(0, 7);
+    setSelectedGraphMonth(now);
+  };
+
+  const handleNextMonth = () => {
+    const [y, m] = selectedGraphMonth.split('-').map(Number);
+    const d = new Date(y, m, 1);
+    setSelectedGraphMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
 
   // Load 7-Day Weekly Timetable
   const loadWeekSchedule = async (offset: number = 0) => {
@@ -127,30 +512,22 @@ export const Overview: React.FC<OverviewProps> = ({
     loadWeekSchedule(weekOffset);
   }, [weekOffset, schedule]);
 
-  // Today metrics
-  const activeBlocks = schedule.filter((s) => s.type !== 'break');
-  const doneBlocks = activeBlocks.filter((s) => s.status === 'done');
-  const isTodayShaped = activeBlocks.length > 0;
+  // Today metrics: Work hours and Timeline Tasks
+  const scheduledWorkBlocks = schedule.filter((s) => s.type !== 'break');
+  const completedWorkBlocks = scheduledWorkBlocks.filter((s) => s.status === 'done');
+  const isTodayShaped = scheduledWorkBlocks.length > 0;
 
-  const nextPendingBlock =
-    activeBlocks.find((s) => s.status === 'pending' && s.end_time >= currentHHMM) ||
-    activeBlocks.find((s) => s.status === 'pending');
+  const totalWorkMins = scheduledWorkBlocks.reduce((sum, s) => sum + s.duration, 0);
+  const completedWorkMins = completedWorkBlocks.reduce((sum, s) => sum + s.duration, 0);
 
-  const todayFocusMinutes = schedule
-    .filter((s) => s.type === 'deep_focus')
-    .reduce((sum, s) => sum + s.duration, 0);
-  const todayFocusHrs = Math.floor(todayFocusMinutes / 60);
-  const todayFocusMins = todayFocusMinutes % 60;
-  const protectedFocusFormatted = isTodayShaped
-    ? `${todayFocusHrs}h ${todayFocusMins}m`
-    : '0h 0m';
-
-  const promisesFormatted = isTodayShaped
-    ? `${doneBlocks.length}/${activeBlocks.length}`
-    : '0/0';
+  const completedWorkHoursFormatted = `${Math.floor(completedWorkMins / 60)}h ${completedWorkMins % 60}m`;
+  const totalWorkHoursFormatted = `${Math.floor(totalWorkMins / 60)}h ${totalWorkMins % 60}m`;
+  const workHoursRatio = isTodayShaped
+    ? `${completedWorkHoursFormatted} / ${totalWorkHoursFormatted}`
+    : '0h 0m / 0h 0m';
 
   const rhythmRate = isTodayShaped
-    ? Math.round((doneBlocks.length / activeBlocks.length) * 100)
+    ? Math.round((completedWorkBlocks.length / scheduledWorkBlocks.length) * 100)
     : 0;
 
   // Active habits metrics
@@ -178,7 +555,7 @@ export const Overview: React.FC<OverviewProps> = ({
     ? Math.min(100, Math.round((totalWeeklyCompleted / totalWeeklyTarget) * 100))
     : 0;
 
-  // Dynamic Greeting based on current hour
+  // Dynamic Greeting
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -194,59 +571,6 @@ export const Overview: React.FC<OverviewProps> = ({
       day: 'numeric',
     }).format(new Date());
   }, []);
-
-  // Monthly Calendar Matrix calculations
-  const monthCalendar = useMemo(() => {
-    const now = new Date();
-    now.setMonth(now.getMonth() + selectedMonthOffset);
-    const year = now.getFullYear();
-    const month = now.getMonth();
-
-    const monthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 is Sun
-    const leadingSlots = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1; // Mon-first
-
-    const todayDate = selectedMonthOffset === 0 ? new Date().getDate() : -1;
-
-    const daysArray = Array.from({ length: daysInMonth }, (_, i) => {
-      const dayNum = i + 1;
-      const isPast = selectedMonthOffset < 0 || (selectedMonthOffset === 0 && dayNum <= todayDate);
-      const isToday = selectedMonthOffset === 0 && dayNum === todayDate;
-
-      // Deterministic activity estimation from streaks for visual density
-      const simulatedRate = isToday
-        ? (activeHabits.length > 0 ? Math.round((completedHabitsToday / activeHabits.length) * 100) : 0)
-        : isPast
-        ? Math.min(100, Math.max(0, Math.round(((avgStreak * 15 + (dayNum % 7) * 12) % 100))))
-        : 0;
-
-      return {
-        dayNum,
-        isPast,
-        isToday,
-        intensity: simulatedRate >= 80 ? 3 : simulatedRate >= 40 ? 2 : simulatedRate > 0 ? 1 : 0,
-        rate: simulatedRate,
-      };
-    });
-
-    return {
-      monthName,
-      daysInMonth,
-      leadingSlots,
-      days: daysArray,
-      todayDate,
-    };
-  }, [selectedMonthOffset, activeHabits, completedHabitsToday, avgStreak]);
-
-  const handleQuickIncrement = async (e: React.MouseEvent, id: string, completed: number, target: number) => {
-    e.stopPropagation();
-    if (completed >= target) return;
-    confetti({ particleCount: 40, spread: 45, origin: { y: 0.6 } });
-    if (onIncrementWeeklyGoal) {
-      await onIncrementWeeklyGoal(id, completed);
-    }
-  };
 
   return (
     <div className="space-y-10 animate-fadeIn pb-12">
@@ -314,66 +638,64 @@ export const Overview: React.FC<OverviewProps> = ({
 
       {/* 2. EXECUTIVE PULSE METRIC CARDS (4-Column Matrix) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Card 1: Protected Focus Today */}
+        {/* Card 1: Work Hours Today (Completed / Scheduled) */}
         <div
           onClick={() => onSelectTab('daily')}
           className="bg-luma-card border border-luma-card-border hover:border-luma-lime/40 rounded-3xl p-5 cursor-pointer transition-all group relative overflow-hidden shadow-sm"
         >
           <div className="flex items-center justify-between mb-3">
             <span className="text-[11px] font-mono uppercase tracking-wider text-luma-text-dim group-hover:text-luma-lime transition-colors">
-              Protected Focus
+              Work Hours Today
             </span>
             <div className="w-7 h-7 rounded-xl bg-luma-lime/10 flex items-center justify-center text-luma-lime">
               <Clock className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-3xl font-bold tracking-tight text-white mb-1">
-            {protectedFocusFormatted}
+          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-1 truncate">
+            {workHoursRatio}
           </div>
           <div className="flex items-center justify-between text-xs font-mono text-luma-text-muted mt-3">
-            <span>Today's deep work</span>
+            <span>Completed / Scheduled</span>
             <span className={isTodayShaped ? 'text-luma-lime font-medium' : 'text-amber-400/90 font-medium'}>
               {isTodayShaped
-                ? nextPendingBlock
-                  ? `Next ${nextPendingBlock.start_time}`
-                  : 'All complete'
+                ? `${Math.round((completedWorkMins / Math.max(totalWorkMins, 1)) * 100)}% done`
                 : 'Unshaped'}
             </span>
           </div>
         </div>
 
-        {/* Card 2: Promises Kept / Rhythm Rate */}
+        {/* Card 2: Timeline Tasks Today (Completed / Total) */}
         <div
           onClick={() => onSelectTab('daily')}
           className="bg-luma-card border border-luma-card-border hover:border-luma-purple/40 rounded-3xl p-5 cursor-pointer transition-all group relative overflow-hidden shadow-sm"
         >
           <div className="flex items-center justify-between mb-3">
             <span className="text-[11px] font-mono uppercase tracking-wider text-luma-text-dim group-hover:text-luma-purple transition-colors">
-              Promises Kept
+              Timeline Tasks
             </span>
             <div className="w-7 h-7 rounded-xl bg-luma-purple/10 flex items-center justify-center text-luma-purple">
               <CheckCircle2 className="w-3.5 h-3.5" />
             </div>
           </div>
           <div className="text-3xl font-bold tracking-tight text-white mb-1">
-            {promisesFormatted}
+            {isTodayShaped ? `${completedWorkBlocks.length} / ${scheduledWorkBlocks.length}` : '0 / 0'}
           </div>
           <div className="flex items-center justify-between text-xs font-mono text-luma-text-muted mt-3">
-            <span>{rhythmRate}% rhythm score</span>
+            <span>Completed / Total</span>
             <span className={isTodayShaped ? 'text-luma-purple font-medium' : 'text-luma-text-dim'}>
-              {isTodayShaped ? `${doneBlocks.length} completed` : 'No blocks yet'}
+              {isTodayShaped ? `${rhythmRate}% rhythm score` : 'No blocks'}
             </span>
           </div>
         </div>
 
-        {/* Card 3: Active Habit Anchors */}
+        {/* Card 3: Completed Habits Today */}
         <div
           onClick={() => onSelectTab('tasks')}
           className="bg-luma-card border border-luma-card-border hover:border-[#f08a5d]/40 rounded-3xl p-5 cursor-pointer transition-all group relative overflow-hidden shadow-sm"
         >
           <div className="flex items-center justify-between mb-3">
             <span className="text-[11px] font-mono uppercase tracking-wider text-luma-text-dim group-hover:text-[#f08a5d] transition-colors">
-              Habit Anchors
+              Habits Today
             </span>
             <div className="w-7 h-7 rounded-xl bg-[#f08a5d]/10 flex items-center justify-center text-[#f08a5d]">
               <Flame className="w-3.5 h-3.5" />
@@ -383,31 +705,40 @@ export const Overview: React.FC<OverviewProps> = ({
             {completedHabitsToday} / {activeHabits.length}
           </div>
           <div className="flex items-center justify-between text-xs font-mono text-luma-text-muted mt-3">
-            <span>Done today</span>
+            <span>Completed Today</span>
             <span className="text-[#f08a5d]">
               🔥 {avgStreak}d avg streak
             </span>
           </div>
         </div>
 
-        {/* Card 4: Weekly Sprint Pacing */}
+        {/* Card 4: Weekly Task Completion Percentage Visual */}
         <div
           onClick={() => onSelectTab('tasks')}
-          className="bg-luma-card border border-luma-card-border hover:border-emerald-500/40 rounded-3xl p-5 cursor-pointer transition-all group relative overflow-hidden shadow-sm"
+          className="bg-luma-card border border-luma-card-border hover:border-emerald-500/40 rounded-3xl p-5 cursor-pointer transition-all group relative overflow-hidden shadow-sm flex flex-col justify-between"
         >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-luma-text-dim group-hover:text-emerald-400 transition-colors">
-              Weekly Sprints
-            </span>
-            <div className="w-7 h-7 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-              <Target className="w-3.5 h-3.5" />
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-luma-text-dim group-hover:text-emerald-400 transition-colors">
+                Weekly Sprint Pacing
+              </span>
+              <div className="w-7 h-7 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                <Target className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="text-3xl font-bold tracking-tight text-white mb-2">
+              {weeklySprintProgress}%
+            </div>
+            {/* Visual Progress Bar */}
+            <div className="w-full h-1.5 bg-[#252825] rounded-full overflow-hidden mb-2">
+              <div
+                className="h-full rounded-full transition-all duration-500 bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]"
+                style={{ width: `${weeklySprintProgress}%` }}
+              />
             </div>
           </div>
-          <div className="text-3xl font-bold tracking-tight text-white mb-1">
-            {totalWeeklyCompleted} / {totalWeeklyTarget || 0}
-          </div>
-          <div className="flex items-center justify-between text-xs font-mono text-luma-text-muted mt-3">
-            <span>{weeklySprintProgress}% sprint pace</span>
+          <div className="flex items-center justify-between text-xs font-mono text-luma-text-muted mt-1">
+            <span>{totalWeeklyCompleted} / {totalWeeklyTarget || 0} units</span>
             <span className="text-emerald-400">
               {weeklyGoals.length} goals
             </span>
@@ -431,20 +762,17 @@ export const Overview: React.FC<OverviewProps> = ({
                 {weeklyScheduleData?.weekStart} → {weeklyScheduleData?.weekEnd}
               </span>
             </div>
-            <h2 className="text-xl font-semibold text-white tracking-tight">
-              Focus allocation across the week
-            </h2>
+            <h3 className="text-lg font-semibold text-white tracking-tight">
+              7-Day focus commitments & pacing rhythm
+            </h3>
           </div>
 
-          {/* Week offset controls */}
+          {/* Week Navigation Controls */}
           <div className="flex items-center gap-2">
-            <div className="text-xs font-mono text-luma-text-dim mr-2 hidden sm:block">
-              {weeklyScheduleData?.totalWeekFocusHours || 0}h planned this week
-            </div>
             <button
               type="button"
               onClick={() => setWeekOffset((prev) => prev - 1)}
-              className="p-2 rounded-xl bg-[#1b1c1b] border border-white/10 hover:bg-white/10 text-white transition-all cursor-pointer"
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5"
               title="Previous week"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -452,18 +780,14 @@ export const Overview: React.FC<OverviewProps> = ({
             <button
               type="button"
               onClick={() => setWeekOffset(0)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-mono transition-all cursor-pointer ${
-                weekOffset === 0
-                  ? 'bg-luma-lime text-black font-bold'
-                  : 'bg-[#1b1c1b] border border-white/10 text-white hover:bg-white/10'
-              }`}
+              className="px-3.5 py-2 rounded-xl text-xs font-mono bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5 font-medium"
             >
               Current Week
             </button>
             <button
               type="button"
               onClick={() => setWeekOffset((prev) => prev + 1)}
-              className="p-2 rounded-xl bg-[#1b1c1b] border border-white/10 hover:bg-white/10 text-white transition-all cursor-pointer"
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5"
               title="Next week"
             >
               <ChevronRight className="w-4 h-4" />
@@ -471,130 +795,99 @@ export const Overview: React.FC<OverviewProps> = ({
           </div>
         </div>
 
-        {/* 7-Day Timetable Grid */}
+        {/* 7 Columns for Mon -> Sun */}
         {loadingWeek ? (
-          <div className="py-24 text-center space-y-3">
-            <div className="w-8 h-8 rounded-full border-2 border-luma-lime border-t-transparent animate-spin mx-auto" />
-            <p className="text-xs font-mono text-luma-text-muted">Loading weekly timetable matrix...</p>
+          <div className="py-16 text-center text-xs font-mono text-luma-text-muted">
+            Loading weekly matrix...
           </div>
-        ) : weeklyScheduleData?.days && weeklyScheduleData.days.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3.5 relative z-10">
+        ) : weeklyScheduleData ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3 relative z-10">
             {weeklyScheduleData.days.map((day) => {
-              const dateObj = new Date(`${day.date}T00:00:00Z`);
-              const dateNum = dateObj.getUTCDate();
               const isToday = day.isToday;
-              const nonBreakBlocks = day.blocks.filter((b) => b.type !== 'break');
+              const hasBlocks = day.blocks && day.blocks.length > 0;
+              const completedCount = day.blocks.filter((b) => b.status === 'done').length;
 
               return (
                 <div
-                  key={day.date}
+                  key={day.dayCode}
                   onClick={() => {
-                    if (onSelectDay) onSelectDay(day.date);
-                    onSelectTab('daily');
+                    if (onSelectDay) {
+                      onSelectDay(day.date);
+                    }
                   }}
-                  className={`flex flex-col justify-between p-3.5 rounded-2xl border transition-all cursor-pointer group ${
+                  className={`p-4 rounded-2xl border transition-all flex flex-col justify-between cursor-pointer group ${
                     isToday
-                      ? 'bg-[#182216] border-luma-lime/50 shadow-[0_0_15px_rgba(212,249,56,0.12)]'
-                      : day.isShaped
-                      ? 'bg-[#181a18] border-white/[0.08] hover:border-white/20 hover:bg-[#1f211f]'
-                      : 'bg-[#131413] border-white/[0.04] opacity-75 hover:opacity-100 hover:border-white/15'
+                      ? 'bg-luma-purple/5 border-luma-purple/40 ring-1 ring-luma-purple/30'
+                      : 'bg-[#151715]/60 hover:bg-[#191b19] border-white/[0.06] hover:border-white/15'
                   }`}
-                  title={`Open Daily Plan for ${day.dayName} (${day.date})`}
                 >
-                  {/* Top Bar of Day Column */}
                   <div>
+                    {/* Day Header */}
                     <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-mono font-bold uppercase text-white">
+                          {day.dayCode}
+                        </span>
+                        {isToday && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-luma-lime shadow-[0_0_6px_#d4f938] animate-pulse" />
+                        )}
+                      </div>
+                      <span className="text-[11px] font-mono text-luma-text-dim">
+                        {day.date.split('-').slice(1).join('/')}
+                      </span>
+                    </div>
+
+                    {/* Focus Hours Pill */}
+                    <div className="mb-3">
                       <span
-                        className={`text-[11px] font-mono font-bold tracking-wider uppercase ${
-                          isToday ? 'text-luma-lime' : 'text-luma-text-dim group-hover:text-white'
+                        className={`text-[10px] font-mono px-2 py-0.5 rounded-md border ${
+                          day.focusHours > 0
+                            ? 'bg-luma-lime/10 text-luma-lime border-luma-lime/20'
+                            : 'bg-white/5 text-luma-text-dim border-white/5'
                         }`}
                       >
-                        {day.dayCode}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        {isToday && (
-                          <span className="w-2 h-2 rounded-full bg-luma-lime animate-pulse" />
-                        )}
-                        <span
-                          className={`text-xs font-mono font-bold px-2 py-0.5 rounded-lg ${
-                            isToday
-                              ? 'bg-luma-lime text-black'
-                              : 'bg-white/5 text-luma-text-muted group-hover:text-white'
-                          }`}
-                        >
-                          {dateNum}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Hours Badge */}
-                    <div className="flex items-center justify-between text-[10px] font-mono text-luma-text-dim mb-3 pb-2 border-b border-white/[0.04]">
-                      <span>{day.focusHours}h focus</span>
-                      <span>
-                        {day.completedBlocks}/{day.totalBlocks} done
+                        {day.focusHours}h focus
                       </span>
                     </div>
 
-                    {/* Timeline Blocks Mini-Stack */}
-                    {nonBreakBlocks.length > 0 ? (
-                      <div className="space-y-1.5 min-h-[140px]">
-                        {nonBreakBlocks.slice(0, 4).map((b) => {
-                          const isDone = b.status === 'done';
-                          const isDeep = b.type === 'deep_focus';
-                          const isLongTerm = b.block_source === 'long_term_goal';
-
-                          const tagColor = isDone
-                            ? 'bg-luma-lime/10 text-luma-lime border-luma-lime/30'
-                            : isLongTerm
-                            ? 'bg-blue-500/10 text-blue-300 border-blue-500/30'
-                            : isDeep
-                            ? 'bg-luma-purple/10 text-luma-purple border-luma-purple/30'
-                            : 'bg-white/5 text-luma-text-muted border-white/10';
-
-                          return (
-                            <div
-                              key={b.id}
-                              className={`p-2 rounded-xl border text-[11px] leading-snug transition-all ${tagColor}`}
-                            >
-                              <div className="flex items-center justify-between gap-1 text-[9px] font-mono text-luma-text-dim mb-0.5">
-                                <span>{b.start_time}</span>
-                                <span>{b.duration}m</span>
-                              </div>
-                              <div className="truncate font-medium text-white flex items-center gap-1.5">
-                                {onToggleScheduleStatus ? (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onToggleScheduleStatus(b.id, day.date);
-                                    }}
-                                    className="shrink-0 cursor-pointer hover:scale-110 transition-transform"
-                                    title={isDone ? 'Mark pending' : 'Mark done'}
-                                  >
-                                    {isDone ? (
-                                      <CheckCircle2 className="w-3 h-3 text-luma-lime" />
-                                    ) : (
-                                      <Circle className="w-3 h-3 text-white/30 hover:text-white" />
-                                    )}
-                                  </button>
-                                ) : isDone ? (
-                                  <CheckCircle2 className="w-3 h-3 text-luma-lime shrink-0" />
-                                ) : null}
-                                <span className="truncate">{b.title}</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        {nonBreakBlocks.length > 4 && (
-                          <div className="text-[10px] font-mono text-center text-luma-text-dim pt-1">
-                            +{nonBreakBlocks.length - 4} more blocks
+                    {/* Block Stack Preview */}
+                    {hasBlocks ? (
+                      <div className="space-y-1.5 mb-3">
+                        {day.blocks.slice(0, 3).map((block) => (
+                          <div
+                            key={block.id}
+                            onClick={(e) => {
+                              if (onToggleScheduleStatus) {
+                                e.stopPropagation();
+                                onToggleScheduleStatus(block.id, day.date);
+                              }
+                            }}
+                            className={`px-2 py-1.5 rounded-lg text-[10px] font-mono border transition-all flex items-center justify-between gap-1 ${
+                              block.status === 'done'
+                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300 line-through opacity-70'
+                                : block.type === 'deep_focus'
+                                ? 'bg-luma-purple/10 border-luma-purple/20 text-luma-purple hover:border-luma-purple/40'
+                                : 'bg-white/5 border-white/5 text-luma-text-muted hover:border-white/10'
+                            }`}
+                            title={`Toggle status: ${block.title}`}
+                          >
+                            <span className="truncate">{block.title}</span>
+                            <span className="shrink-0 text-[9px] opacity-70">
+                              {block.duration}m
+                            </span>
+                          </div>
+                        ))}
+                        {day.blocks.length > 3 && (
+                          <div className="text-[9px] font-mono text-luma-text-dim pl-1">
+                            +{day.blocks.length - 3} more block{day.blocks.length - 3 > 1 ? 's' : ''}
                           </div>
                         )}
                       </div>
                     ) : (
-                      <div className="min-h-[140px] flex flex-col items-center justify-center text-center p-2 rounded-xl border border-dashed border-white/5">
-                        <span className="text-[10px] font-mono text-white/30 mb-2">Unshaped</span>
+                      <div className="py-6 text-center">
+                        <span className="text-[10px] font-mono text-luma-text-dim/60 block mb-1">
+                          Unshaped
+                        </span>
                         {onOpenShapeMyDay && (
                           <button
                             type="button"
@@ -602,7 +895,7 @@ export const Overview: React.FC<OverviewProps> = ({
                               e.stopPropagation();
                               onOpenShapeMyDay(day.date);
                             }}
-                            className="text-[10px] font-mono text-luma-lime hover:underline flex items-center gap-1"
+                            className="text-[10px] font-mono text-luma-lime hover:underline flex items-center gap-1 mx-auto"
                           >
                             <Sparkles className="w-3 h-3" />
                             <span>Shape</span>
@@ -614,7 +907,7 @@ export const Overview: React.FC<OverviewProps> = ({
 
                   {/* Bottom Day Link */}
                   <div className="pt-3 mt-2 border-t border-white/[0.04] flex items-center justify-between text-[10px] font-mono text-luma-text-dim group-hover:text-luma-lime">
-                    <span>View Day</span>
+                    <span>{hasBlocks ? `${completedCount}/${day.blocks.length} done` : 'View Day'}</span>
                     <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                   </div>
                 </div>
@@ -624,389 +917,84 @@ export const Overview: React.FC<OverviewProps> = ({
         ) : null}
       </div>
 
-      {/* 4. DUAL SECTION: MONTHLY HABIT PROGRESS (7 Cols) + LONG-TERM RUNWAY & SPRINTS (5 Cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* LEFT COLUMN: MONTHLY HABIT PROGRESS GRAPHS (7 cols) */}
-        <div className="lg:col-span-7 space-y-6">
-          <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 relative overflow-hidden shadow-md">
-            {/* Header with Month Switcher */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-mono font-bold uppercase tracking-widest text-[#f08a5d]">
-                    Monthly Habit Consistency
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#f08a5d]/10 text-[#f08a5d] border border-[#f08a5d]/20">
-                    {monthCalendar.monthName}
-                  </span>
-                </div>
-                <h3 className="text-lg font-semibold text-white tracking-tight">
-                  Daily anchors adherence matrix
-                </h3>
-              </div>
-
-              {/* Month Navigation */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setSelectedMonthOffset((prev) => prev - 1)}
-                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer"
-                  title="Previous month"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedMonthOffset(0)}
-                  className="px-2.5 py-1 rounded-lg text-xs font-mono bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer"
-                >
-                  This Month
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedMonthOffset((prev) => Math.min(0, prev + 1))}
-                  disabled={selectedMonthOffset >= 0}
-                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white transition-colors disabled:opacity-30 cursor-pointer"
-                  title="Next month"
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+      {/* 4. DUAL SECTION: MONTHLY PERFORMANCE LINE GRAPHS (Habit Points & Timetable Task Points) */}
+      <div className="space-y-6">
+        {/* Section Header with Synchronized Month Navigator */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 bg-luma-card border border-luma-card-border rounded-3xl shadow-sm">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-mono font-bold uppercase tracking-widest text-luma-lime">
+                Monthly Performance Curves
+              </span>
+              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-white/5 text-white border border-white/10">
+                {graphMonthLabel}
+              </span>
             </div>
+            <h3 className="text-lg font-semibold text-white tracking-tight">
+              Habit & Timetable Task Points Progression
+            </h3>
+            <p className="text-xs text-luma-text-muted mt-0.5">
+              Daily point accumulation trends across the 30/31-day monthly horizon.
+            </p>
+          </div>
 
-            {/* Monthly Calendar Heatmap Grid */}
-            <div className="mb-6 p-4 rounded-2xl bg-[#141514] border border-white/[0.04]">
-              {/* Day-of-week headers */}
-              <div className="grid grid-cols-7 gap-1.5 mb-2 text-center">
-                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((dayChar, i) => (
-                  <span key={i} className="text-[10px] font-mono text-luma-text-dim uppercase font-semibold">
-                    {dayChar}
-                  </span>
-                ))}
-              </div>
-
-              {/* Day cells */}
-              <div className="grid grid-cols-7 gap-1.5">
-                {Array.from({ length: monthCalendar.leadingSlots }).map((_, i) => (
-                  <div key={`empty-${i}`} className="h-8 rounded-lg bg-transparent" />
-                ))}
-
-                {monthCalendar.days.map((day) => {
-                  const bgIntensity =
-                    day.isToday
-                      ? 'bg-luma-lime/20 border-luma-lime text-white font-bold'
-                      : day.intensity === 3
-                      ? 'bg-luma-lime text-black font-semibold'
-                      : day.intensity === 2
-                      ? 'bg-[#a3c92c] text-black'
-                      : day.intensity === 1
-                      ? 'bg-[#40541d] text-white/80'
-                      : 'bg-[#1c1e1c] text-luma-text-dim border border-white/[0.03]';
-
-                  return (
-                    <div
-                      key={`day-${day.dayNum}`}
-                      className={`h-8 rounded-lg flex items-center justify-center text-[10px] font-mono transition-all hover:scale-105 cursor-default ${bgIntensity}`}
-                      title={`Day ${day.dayNum}: ${day.rate}% habit completion`}
-                    >
-                      <span>{day.dayNum}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Heatmap Legend */}
-              <div className="flex items-center justify-between text-[10px] font-mono text-luma-text-dim pt-3 mt-3 border-t border-white/[0.04]">
-                <span>Habit completion density</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded bg-[#1c1e1c] border border-white/5" />
-                  <span className="w-2.5 h-2.5 rounded bg-[#40541d]" />
-                  <span className="w-2.5 h-2.5 rounded bg-[#a3c92c]" />
-                  <span className="w-2.5 h-2.5 rounded bg-luma-lime" />
-                  <span className="text-[9px] text-white/40 ml-1">High</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Active Habits Breakdown List */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs font-mono text-luma-text-dim mb-1">
-                <span>Active Habit Anchors ({activeHabits.length})</span>
-                <span>Consistency Rate</span>
-              </div>
-
-              {activeHabits.length > 0 ? (
-                activeHabits.map((habit) => {
-                  const isDoneToday = habit.last_completed_date === todayIST;
-                  const normalizedDays = normalizeHabitDays(habit.active_days);
-                  const streak = habit.streak_count || 0;
-                  const adherencePercent = Math.min(100, Math.max(0, Math.round((streak / Math.max(monthCalendar.todayDate || 1, 1)) * 100)));
-
-                  return (
-                    <div
-                      key={habit.id}
-                      className="p-3.5 rounded-2xl bg-[#171917] border border-white/[0.04] hover:border-white/10 transition-all flex items-center justify-between gap-4"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        {onToggleHabit && (
-                          <button
-                            type="button"
-                            onClick={() => onToggleHabit(habit.id)}
-                            className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all cursor-pointer ${
-                              isDoneToday
-                                ? 'bg-luma-lime border-luma-lime text-black'
-                                : 'bg-[#1b1c1b] border-white/15 text-transparent hover:border-white/30'
-                            }`}
-                            title={isDoneToday ? 'Completed today! Click to toggle' : 'Mark done today'}
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold text-white truncate flex items-center gap-2">
-                            <span>{habit.title}</span>
-                            <span className="text-[10px] font-mono text-[#f08a5d] bg-[#f08a5d]/10 px-1.5 py-0.5 rounded-md">
-                              🔥 {streak}d
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[10px] font-mono text-luma-text-dim mt-0.5">
-                            <span className="capitalize">{habit.anchor} anchor</span>
-                            <span>•</span>
-                            <span>{habit.habit_type}</span>
-                            {habit.target_value && (
-                              <>
-                                <span>•</span>
-                                <span className="text-white/60">{habit.target_value} {habit.target_unit || ''}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right: Adherence Bar & Active Day Pills */}
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        <div className="flex items-center gap-1">
-                          {WEEK_DAYS_CONFIG.map((d) => (
-                            <span
-                              key={d.key}
-                              className={`w-3.5 h-3.5 rounded-sm text-[8px] font-mono flex items-center justify-center font-bold ${
-                                normalizedDays.includes(d.key)
-                                  ? 'bg-white/15 text-white'
-                                  : 'text-white/20'
-                              }`}
-                            >
-                              {d.label}
-                            </span>
-                          ))}
-                        </div>
-                        <span className="text-[10px] font-mono text-luma-text-dim">
-                          {adherencePercent}% adherence
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="py-8 text-center text-xs font-mono text-luma-text-muted">
-                  No habits defined yet. Open Tasks to add your daily anchors.
-                </div>
-              )}
-            </div>
+          {/* Synchronized Month Navigation Controls */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5"
+              title="Previous month"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={handleCurrentMonth}
+              className="px-3.5 py-2 rounded-xl text-xs font-mono bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5 font-medium"
+            >
+              This Month
+            </button>
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5"
+              title="Next month"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: LONG-TERM GOAL RADAR + WEEKLY SPRINTS (5 cols) */}
-        <div className="lg:col-span-5 space-y-6">
-          {/* Card 1: Long-Term Goals Portfolio & Milestone Radar */}
-          <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 relative overflow-hidden shadow-md">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <span className="text-xs font-mono font-bold uppercase tracking-widest text-luma-lime">
-                  Long-Term Horizon
-                </span>
-                <h3 className="text-base font-semibold text-white tracking-tight">
-                  Learning paths & projects
-                </h3>
-              </div>
-              <span className="text-[11px] font-mono tracking-wider uppercase text-luma-text-dim bg-[#212421] px-2.5 py-1 rounded-full border border-white/5">
-                {goals.length} ACTIVE
-              </span>
-            </div>
+        {/* Dual Line Graphs Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Chart 1: Monthly Habit Points Line Graph */}
+          <MonthlyPointsLineChart
+            title="Monthly Habit Points Curve"
+            subtitle="1 point per completed habit daily"
+            badgeLabel="HABIT CADENCE"
+            colorScheme="lime"
+            points={habitPointsData?.points || []}
+            maxY={habitPointsData?.totalHabits ? Math.max(habitPointsData.totalHabits, 5) : 6}
+            yUnitLabel="pts"
+            isLoading={loadingPoints}
+          />
 
-            {/* Goals List */}
-            {goals.length > 0 ? (
-              <div className="space-y-4">
-                {goals.map((goal, idx) => {
-                  const progress = Math.min(
-                    100,
-                    Math.round((goal.covered_units / Math.max(goal.total_units, 1)) * 100)
-                  );
-                  const barColors = [
-                    'bg-luma-purple shadow-[0_0_12px_rgba(123,110,246,0.5)]',
-                    'bg-luma-lime shadow-[0_0_12px_rgba(212,249,56,0.4)]',
-                    'bg-[#f08a5d] shadow-[0_0_12px_rgba(240,138,93,0.4)]',
-                  ];
-                  const barColor = barColors[idx % barColors.length];
-
-                  const target = new Date(goal.target_date).getTime();
-                  const now = new Date().getTime();
-                  const daysLeft = Math.max(0, Math.ceil((target - now) / (1000 * 60 * 60 * 24)));
-
-                  // Find next pending syllabus topic
-                  const nextTopic = goal.syllabus?.find((t) => !t.covered)?.name || 'Curriculum completed';
-
-                  return (
-                    <div
-                      key={goal.id}
-                      onClick={() => {
-                        if (onSelectGoal) onSelectGoal(goal.id);
-                        onSelectTab('learning');
-                      }}
-                      className="p-3.5 rounded-2xl bg-[#171917] border border-white/[0.04] hover:border-white/10 cursor-pointer transition-all group"
-                      title="Click to view full curriculum in Projects & Goals"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-semibold text-white group-hover:text-luma-lime transition-colors">
-                            {goal.title} →
-                          </span>
-                          {goal.category && (
-                            <span
-                              className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full border ${
-                                getCategoryBadge(goal.category).color
-                              }`}
-                            >
-                              {getCategoryBadge(goal.category).label}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-xs font-mono font-medium text-[#f08a5d]">
-                          {daysLeft}d left
-                        </span>
-                      </div>
-
-                      {/* Milestone Radar: Next Topic Due */}
-                      <div className="text-[11px] font-mono text-luma-text-muted mb-2.5 flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-lg truncate">
-                        <Target className="w-3 h-3 text-luma-lime shrink-0" />
-                        <span className="truncate">Next: {nextTopic}</span>
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className="w-full h-1.5 bg-[#252825] rounded-full overflow-hidden mb-2">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
-
-                      {/* Units & Percent */}
-                      <div className="flex items-center justify-between text-xs font-mono text-luma-text-muted">
-                        <span>
-                          {goal.covered_units} / {goal.total_units} {goal.unit_label}
-                        </span>
-                        <span>{progress}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="py-8 text-center text-xs font-mono text-luma-text-muted">
-                No active long-term goals. Open Projects & Goals to set up your roadmaps.
-              </div>
-            )}
-          </div>
-
-          {/* Card 2: Active Weekly Sprint Goals */}
-          <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 relative overflow-hidden shadow-md">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <span className="text-xs font-mono font-bold uppercase tracking-widest text-emerald-400">
-                  Weekly Sprint Goals
-                </span>
-                <h3 className="text-base font-semibold text-white tracking-tight">
-                  Execution targets for this week
-                </h3>
-              </div>
-              <span className="text-[11px] font-mono tracking-wider uppercase text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                {weeklyGoals.length} ACTIVE
-              </span>
-            </div>
-
-            {weeklyGoals.length > 0 ? (
-              <div className="space-y-3.5">
-                {weeklyGoals.map((wg) => {
-                  const progress = Math.min(
-                    100,
-                    Math.round((wg.completed_units / Math.max(wg.target_units, 1)) * 100)
-                  );
-                  const isDone = wg.completed_units >= wg.target_units;
-
-                  return (
-                    <div
-                      key={wg.id}
-                      onClick={() => onSelectTab('tasks')}
-                      className="p-3.5 rounded-2xl bg-[#171917] border border-white/[0.04] hover:border-white/10 transition-all group cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-xs font-semibold text-white truncate group-hover:text-emerald-400 transition-colors">
-                            {wg.title}
-                          </span>
-                          {wg.priority === 'HIGH' && (
-                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-red-500/10 text-red-300 border border-red-500/20">
-                              HIGH
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Quick increment button */}
-                        {isDone ? (
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 select-none font-semibold">
-                            <span>✓ Completed</span>
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => handleQuickIncrement(e, wg.id, wg.completed_units, wg.target_units)}
-                            className="px-2 py-1 rounded-lg text-[10px] font-mono bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 transition-all cursor-pointer active:scale-95"
-                            title="Increment +1 unit"
-                          >
-                            <Plus className="w-2.5 h-2.5" />
-                            <span>+1</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className="w-full h-1.5 bg-[#252825] rounded-full overflow-hidden mb-2">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            isDone ? 'bg-emerald-400' : 'bg-luma-lime'
-                          }`}
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between text-[11px] font-mono text-luma-text-muted">
-                        <span>
-                          {wg.completed_units} / {wg.target_units} {wg.unit_label}
-                        </span>
-                        <span className={wg.isBehindPace ? 'text-amber-400' : 'text-emerald-400'}>
-                          {wg.isBehindPace ? 'Behind pace' : isDone ? 'Completed' : 'On pace'}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="py-8 text-center text-xs font-mono text-luma-text-muted">
-                No weekly goals created yet. Open Tasks to start your first weekly sprint.
-              </div>
-            )}
-          </div>
+          {/* Chart 2: Monthly Timetable Task Points Line Graph */}
+          <MonthlyPointsLineChart
+            title="Monthly Timetable Task Points Curve"
+            subtitle="Points scored from completed timetable blocks"
+            badgeLabel="TIMELINE EXECUTION"
+            colorScheme="purple"
+            points={taskPointsData?.points || []}
+            maxY={
+              taskPointsData?.points?.length
+                ? Math.max(...taskPointsData.points.map((p) => p.points), 5)
+                : 6
+            }
+            yUnitLabel="tasks"
+            isLoading={loadingPoints}
+          />
         </div>
       </div>
     </div>

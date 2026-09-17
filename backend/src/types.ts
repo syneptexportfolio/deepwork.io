@@ -29,6 +29,7 @@ export interface Task {
   category: string | null;
   goal_id: string | null;
   column_bucket: ColumnBucket;
+  task_date?: string | null;
   created_at: string;
 }
 
@@ -79,6 +80,7 @@ export interface Habit {
   last_completed_date?: string;
   frequency_type?: FrequencyType;
   frequency_value?: number;
+  month?: string;
 }
 
 export interface WeeklyGoal {

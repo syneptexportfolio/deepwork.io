@@ -410,6 +410,11 @@ scheduleRouter.patch('/block/:blockId', async (c) => {
     const targetBlock = blocks.find(b => b.id === blockId);
 
     if (targetBlock) {
+      const previousStatus = targetBlock.status;
+      if (previousStatus === status) {
+        return c.json({ success: true, schedule: blocks });
+      }
+
       targetBlock.status = status;
 
       // Persist updated plan in D1
@@ -424,57 +429,107 @@ scheduleRouter.patch('/block/:blockId', async (c) => {
         ).bind(status, targetBlock.task_id).run();
       }
 
-      // If source is weekly_goal and marked done, increment progress
-      if (targetBlock.block_source === 'weekly_goal' && status === 'done') {
-        await c.env.DB.prepare(
-          `UPDATE weekly_goals 
-           SET completed_units = MIN(target_units, completed_units + 1)
-           WHERE title = ? OR title LIKE ?`
-        ).bind(targetBlock.title, `%${targetBlock.title}%`).run();
+      // If source is weekly_goal: handle increment or decrement
+      if (targetBlock.block_source === 'weekly_goal') {
+        const wg = await c.env.DB.prepare(
+          'SELECT * FROM weekly_goals WHERE title = ? OR title LIKE ?'
+        ).bind(targetBlock.title, `%${targetBlock.title}%`).first<any>();
+
+        if (wg) {
+          if (status === 'done' && previousStatus !== 'done') {
+            await c.env.DB.prepare(
+              'UPDATE weekly_goals SET completed_units = MIN(target_units, completed_units + 1) WHERE id = ?'
+            ).bind(wg.id).run();
+          } else if (status !== 'done' && previousStatus === 'done') {
+            await c.env.DB.prepare(
+              'UPDATE weekly_goals SET completed_units = MAX(0, completed_units - 1) WHERE id = ?'
+            ).bind(wg.id).run();
+          }
+        }
       }
 
-      // If source is habit and marked done, increment streak and update last_completed_date
-      if (targetBlock.block_source === 'habit' && status === 'done') {
-        const todayIST = getTodayIST();
-        await c.env.DB.prepare(
-          `UPDATE habits 
-           SET streak_count = streak_count + 1, last_completed_date = ? 
-           WHERE title = ? OR title LIKE ?`
-        ).bind(todayIST, targetBlock.title, `%${targetBlock.title}%`).run();
+      // If source is habit: handle streak increment/decrement and habit_completions tracking
+      if (targetBlock.block_source === 'habit') {
+        const hab = await c.env.DB.prepare(
+          'SELECT * FROM habits WHERE title = ? OR title LIKE ?'
+        ).bind(targetBlock.title, `%${targetBlock.title}%`).first<any>();
+
+        if (hab) {
+          const todayIST = getTodayIST();
+          if (status === 'done' && previousStatus !== 'done') {
+            await c.env.DB.prepare(
+              'UPDATE habits SET streak_count = streak_count + 1, last_completed_date = ? WHERE id = ?'
+            ).bind(todayIST, hab.id).run();
+
+            await c.env.DB.prepare(
+              'INSERT OR REPLACE INTO habit_completions (id, habit_id, date) VALUES (?, ?, ?)'
+            ).bind(`hc-${hab.id}-${todayIST}`, hab.id, todayIST).run();
+          } else if (status !== 'done' && previousStatus === 'done') {
+            await c.env.DB.prepare(
+              'UPDATE habits SET streak_count = MAX(0, streak_count - 1), last_completed_date = CASE WHEN last_completed_date = ? THEN NULL ELSE last_completed_date END WHERE id = ?'
+            ).bind(todayIST, hab.id).run();
+
+            await c.env.DB.prepare(
+              'DELETE FROM habit_completions WHERE habit_id = ? AND date = ?'
+            ).bind(hab.id, todayIST).run();
+          }
+        }
       }
 
-      // If source is long_term_goal and marked done, mark topic covered in syllabus and update covered_units
-      if (targetBlock.block_source === 'long_term_goal' && status === 'done') {
+      // If source is long_term_goal: handle syllabus topic coverage and unit counters
+      if (targetBlock.block_source === 'long_term_goal') {
         let goalRow: any = null;
         if (targetBlock.goal_id) {
           goalRow = await c.env.DB.prepare('SELECT * FROM goals WHERE id = ?').bind(targetBlock.goal_id).first();
         }
         if (!goalRow) {
-          // Fallback: match by title or prefix
           const allG = await c.env.DB.prepare('SELECT * FROM goals').all<any>();
-          goalRow = (allG.results || []).find((g: any) => targetBlock.title.toLowerCase().includes(g.title.toLowerCase()));
+          goalRow = (allG.results || []).find((g: any) => 
+            targetBlock.title.toLowerCase().includes(g.title.toLowerCase()) || 
+            g.title.toLowerCase().includes(targetBlock.title.toLowerCase())
+          );
         }
 
         if (goalRow) {
           let syllabus: any[] = typeof goalRow.syllabus === 'string' ? JSON.parse(goalRow.syllabus) : goalRow.syllabus || [];
-          let topicMarked = false;
 
-          if (targetBlock.topic_id) {
-            syllabus = syllabus.map((t: any) => {
-              if (t.id === targetBlock.topic_id) {
-                topicMarked = true;
-                return { ...t, covered: true, status: 'COVERED' };
+          if (status === 'done' && previousStatus !== 'done') {
+            let topicMarked = false;
+            if (targetBlock.topic_id) {
+              syllabus = syllabus.map((t: any) => {
+                if (t.id === targetBlock.topic_id) {
+                  topicMarked = true;
+                  return { ...t, covered: true, status: 'COVERED' };
+                }
+                return t;
+              });
+            }
+
+            if (!topicMarked) {
+              const uncov = syllabus.find((t: any) => !t.covered);
+              if (uncov) {
+                uncov.covered = true;
+                uncov.status = 'COVERED';
               }
-              return t;
-            });
-          }
+            }
+          } else if (status !== 'done' && previousStatus === 'done') {
+            let topicUnmarked = false;
+            if (targetBlock.topic_id) {
+              syllabus = syllabus.map((t: any) => {
+                if (t.id === targetBlock.topic_id) {
+                  topicUnmarked = true;
+                  return { ...t, covered: false, status: 'UNTOUCHED' };
+                }
+                return t;
+              });
+            }
 
-          // If topic wasn't found by id, try matching by name or pick first uncovered topic
-          if (!topicMarked) {
-            const uncov = syllabus.find((t: any) => !t.covered);
-            if (uncov) {
-              uncov.covered = true;
-              uncov.status = 'COVERED';
+            if (!topicUnmarked) {
+              const lastCov = [...syllabus].reverse().find((t: any) => t.covered);
+              if (lastCov) {
+                lastCov.covered = false;
+                lastCov.status = 'UNTOUCHED';
+              }
             }
           }
 
@@ -495,4 +550,54 @@ scheduleRouter.patch('/block/:blockId', async (c) => {
     return c.json({ success: false, error: err.message }, 500);
   }
 });
+
+// GET /api/schedule/monthly-task-points?month=YYYY-MM
+scheduleRouter.get('/monthly-task-points', async (c) => {
+  try {
+    const todayIST = getTodayIST();
+    const monthParam = c.req.query('month') || todayIST.slice(0, 7);
+    const [yStr, mStr] = monthParam.split('-');
+    const year = Number(yStr);
+    const month = Number(mStr);
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    const { results } = await c.env.DB.prepare(
+      'SELECT date, generated_plan FROM schedules WHERE date LIKE ?'
+    ).bind(`${monthParam}-%`).all<any>();
+
+    const map: Record<string, { completed: number; total: number }> = {};
+    for (const row of (results || [])) {
+      try {
+        const blocks: ScheduleBlock[] = JSON.parse(row.generated_plan || '[]');
+        const activeBlocks = blocks.filter(b => b.type !== 'break');
+        const completed = activeBlocks.filter(b => b.status === 'done').length;
+        map[row.date] = { completed, total: activeBlocks.length };
+      } catch {
+        map[row.date] = { completed: 0, total: 0 };
+      }
+    }
+
+    const points = Array.from({ length: daysInMonth }, (_, idx) => {
+      const day = idx + 1;
+      const dateStr = `${monthParam}-${String(day).padStart(2, '0')}`;
+      const data = map[dateStr] || { completed: 0, total: 0 };
+      return {
+        day,
+        date: dateStr,
+        points: data.completed,
+        totalTasks: data.total,
+        percentage: data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0,
+      };
+    });
+
+    return c.json({
+      success: true,
+      month: monthParam,
+      points,
+    });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
+
 

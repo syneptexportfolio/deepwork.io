@@ -1,9 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Flame, Sun, Waves, Moon, CheckCircle2, ArrowRight, Trash2, Pencil, RotateCcw, Target, Clock, Sparkles, Trophy, Calendar } from 'lucide-react';
 import { Habit, Task, WeeklyGoal } from '../services/api';
-import { DailyTaskVisualizer } from './visualizers/DailyTaskVisualizer';
-import { WeeklyGoalVisualizer } from './visualizers/WeeklyGoalVisualizer';
-import { MonthlyHabitVisualizer } from './visualizers/MonthlyHabitVisualizer';
+
 import { normalizeHabitDays, WEEK_DAYS_CONFIG } from './modals/HabitModal';
 
 interface TasksProps {
@@ -12,16 +10,18 @@ interface TasksProps {
   weeklyGoals: WeeklyGoal[];
   onAddTask: () => void;
   onEditTask: (task: Task) => void;
-  onToggleStatus: (id: string) => void;
+  onToggleStatus?: (id: string) => void;
   onAddHabit: () => void;
   onEditHabit: (habit: Habit) => void;
-  onCheckHabitStreak: (id: string) => void;
+  onCheckHabitStreak?: (id: string) => void;
   onDeleteHabit: (id: string) => Promise<void>;
   onAddWeeklyGoal: () => void;
   onEditWeeklyGoal: (goal: WeeklyGoal) => void;
   onDeleteWeeklyGoal: (id: string) => Promise<void>;
   onQuickAddTodo: (title: string) => Promise<void>;
-  onIncrementWeeklyGoal: (id: string, currentCompleted: number) => Promise<void>;
+  onIncrementWeeklyGoal?: (id: string, currentCompleted: number) => Promise<void>;
+  onCopyPreviousHabits?: () => Promise<void>;
+  onCopyPreviousWeeklyGoals?: () => Promise<void>;
   onOpenShapeMyDay?: () => void;
 }
 
@@ -33,19 +33,23 @@ export const Tasks: React.FC<TasksProps> = ({
   weeklyGoals,
   onAddTask,
   onEditTask,
-  onToggleStatus,
+  onToggleStatus: _onToggleStatus,
   onAddHabit,
   onEditHabit,
-  onCheckHabitStreak,
+  onCheckHabitStreak: _onCheckHabitStreak,
   onDeleteHabit,
   onAddWeeklyGoal,
   onEditWeeklyGoal,
   onDeleteWeeklyGoal,
   onQuickAddTodo,
-  onIncrementWeeklyGoal,
+  onIncrementWeeklyGoal: _onIncrementWeeklyGoal,
+  onCopyPreviousHabits,
+  onCopyPreviousWeeklyGoals,
   onOpenShapeMyDay,
 }) => {
   const [activeSection, setActiveSection] = useState<SectionTab>('todos');
+  const [isCopyingHabits, setIsCopyingHabits] = useState(false);
+  const [isCopyingWeeklyGoals, setIsCopyingWeeklyGoals] = useState(false);
   const [quickTitle, setQuickTitle] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [confirmingHabitId, setConfirmingHabitId] = useState<string | null>(null);
@@ -67,6 +71,15 @@ export const Tasks: React.FC<TasksProps> = ({
     if (weeklyCategoryFilter === 'all') return weeklyGoals;
     return weeklyGoals.filter((wg) => (wg.category || 'Project').toLowerCase() === weeklyCategoryFilter.toLowerCase());
   }, [weeklyGoals, weeklyCategoryFilter]);
+
+  const weeklyCategories = useMemo(() => {
+    const counts: Record<string, number> = {};
+    weeklyGoals.forEach((g) => {
+      const cat = g.category || 'Project';
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, count]) => ({ name, count }));
+  }, [weeklyGoals]);
 
   const morningTasks = filteredTasks.filter(t => t.column_bucket === 'now' || (t as any).column_bucket === 'morning');
   const afternoonTasks = filteredTasks.filter(t => t.column_bucket === 'up_next' || (t as any).column_bucket === 'afternoon');
@@ -103,17 +116,16 @@ export const Tasks: React.FC<TasksProps> = ({
           <h4 className={`text-sm font-semibold text-white leading-snug ${isDone ? 'line-through opacity-50' : ''}`}>
             {task.title}
           </h4>
-          <button
-            type="button"
-            title={isDone ? 'Mark Pending' : 'Mark Done'}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleStatus(task.id);
-            }}
-            className="text-xs text-luma-text-dim hover:text-luma-lime transition-colors"
-          >
-            {isDone ? '✓' : '○'}
-          </button>
+          {isDone ? (
+            <span className="text-[10px] font-mono font-semibold text-luma-lime bg-luma-lime/10 px-2 py-0.5 rounded-md border border-luma-lime/25 flex items-center gap-1 shrink-0">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>Done</span>
+            </span>
+          ) : (
+            <span className="text-xs text-white/20 select-none shrink-0" title="Completed via Daily Plan schedule">
+              ○
+            </span>
+          )}
         </div>
 
         <div className="text-xs text-luma-text-muted mb-4">
@@ -251,13 +263,6 @@ export const Tasks: React.FC<TasksProps> = ({
       {/* SECTION 1: DAILY TO-DOS */}
       {activeSection === 'todos' && (
         <div className="space-y-6">
-          {/* Graphical Visualization: Daily Completion Ring & Daylight Velocity */}
-          <DailyTaskVisualizer
-            tasks={tasks}
-            activeFilter={taskFilter}
-            onSelectFilter={setTaskFilter}
-          />
-
           {/* Rapid Morning Brain Dump Input Bar */}
           <form onSubmit={handleQuickSubmit} className="flex items-center gap-3">
             <input
@@ -275,6 +280,78 @@ export const Tasks: React.FC<TasksProps> = ({
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
+
+          {/* Minimal Filter Row */}
+          <div className="flex items-center justify-between flex-wrap gap-2 px-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono uppercase text-luma-text-dim tracking-wider">
+                Filter:
+              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setTaskFilter('all')}
+                  className={`px-3 py-1 rounded-xl text-xs font-mono transition-all ${
+                    taskFilter === 'all'
+                      ? 'bg-white text-black font-semibold shadow-sm'
+                      : 'bg-white/[0.04] text-luma-text-muted hover:text-white hover:bg-white/[0.08]'
+                  }`}
+                >
+                  All ({tasks.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTaskFilter('deep_focus')}
+                  className={`px-3 py-1 rounded-xl text-xs font-mono transition-all flex items-center gap-1.5 ${
+                    taskFilter === 'deep_focus'
+                      ? 'bg-luma-purple text-white font-semibold shadow-purple-glow'
+                      : 'bg-white/[0.04] text-luma-purple hover:bg-luma-purple/20'
+                  }`}
+                >
+                  <span>🟣 Deep Work</span>
+                  <span className="opacity-70 text-[10px]">
+                    ({tasks.filter(t => t.energy_level === 'deep_focus').length})
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTaskFilter('light')}
+                  className={`px-3 py-1 rounded-xl text-xs font-mono transition-all flex items-center gap-1.5 ${
+                    taskFilter === 'light'
+                      ? 'bg-luma-lime text-black font-semibold shadow-lime-glow'
+                      : 'bg-white/[0.04] text-luma-lime hover:bg-luma-lime/20'
+                  }`}
+                >
+                  <span>🟢 Light</span>
+                  <span className="opacity-70 text-[10px]">
+                    ({tasks.filter(t => t.energy_level === 'light').length})
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTaskFilter('pending')}
+                  className={`px-3 py-1 rounded-xl text-xs font-mono transition-all ${
+                    taskFilter === 'pending'
+                      ? 'bg-amber-400 text-black font-semibold shadow-sm'
+                      : 'bg-white/[0.04] text-amber-300 hover:bg-amber-400/20'
+                  }`}
+                >
+                  Pending ({tasks.filter(t => t.status === 'pending').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTaskFilter('done')}
+                  className={`px-3 py-1 rounded-xl text-xs font-mono transition-all ${
+                    taskFilter === 'done'
+                      ? 'bg-emerald-400 text-black font-semibold shadow-sm'
+                      : 'bg-white/[0.04] text-emerald-300 hover:bg-emerald-400/20'
+                  }`}
+                >
+                  Done ({tasks.filter(t => t.status === 'done').length})
+                </button>
+              </div>
+            </div>
+          </div>
 
           {/* 3 Time-of-Day Columns: Morning, Afternoon, Evening */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -329,8 +406,7 @@ export const Tasks: React.FC<TasksProps> = ({
       {/* SECTION 2: DAILY HABITS */}
       {activeSection === 'habits' && (
         <div className="space-y-6">
-          {/* Graphical Visualization: Monthly Habit Consistency & 30-Day Heatmap */}
-          <MonthlyHabitVisualizer habits={habits} />
+
           <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 flex items-center justify-between">
             <div>
               <h3 className="text-base font-semibold text-white mb-1">Monthly Habit Routines</h3>
@@ -340,8 +416,30 @@ export const Tasks: React.FC<TasksProps> = ({
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs font-mono text-luma-purple bg-luma-purple-dim px-3 py-1.5 rounded-full">
+                {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }).format(new Date())}
+              </span>
+              <span className="text-xs font-mono text-luma-purple bg-luma-purple-dim px-3 py-1.5 rounded-full">
                 {habits.filter(h => h.is_active).length} Active Daily
               </span>
+              {onCopyPreviousHabits && (
+                <button
+                  type="button"
+                  disabled={isCopyingHabits}
+                  onClick={async () => {
+                    setIsCopyingHabits(true);
+                    try {
+                      await onCopyPreviousHabits();
+                    } finally {
+                      setIsCopyingHabits(false);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium text-xs border border-white/10 transition-all cursor-pointer"
+                  title="Copy habits from last month"
+                >
+                  <RotateCcw className={`w-3.5 h-3.5 ${isCopyingHabits ? 'animate-spin' : ''}`} />
+                  <span>{isCopyingHabits ? 'Copying...' : 'Copy Last Month'}</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onAddHabit}
@@ -358,18 +456,38 @@ export const Tasks: React.FC<TasksProps> = ({
               <div className="w-12 h-12 rounded-2xl bg-luma-purple/10 border border-luma-purple/20 flex items-center justify-center text-luma-purple mb-3">
                 <Flame className="w-6 h-6 stroke-[1.5]" />
               </div>
-              <h4 className="text-base font-semibold text-white mb-1">No daily habits configured</h4>
+              <h4 className="text-base font-semibold text-white mb-1">No daily habits configured for this month</h4>
               <p className="text-xs text-luma-text-muted max-w-sm mb-5 leading-relaxed">
                 Build consistent momentum by defining recurring morning anchors, deep focus rituals, or evening wind-downs.
               </p>
-              <button
-                type="button"
-                onClick={onAddHabit}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-luma-purple hover:bg-luma-purple-glow text-white text-xs font-semibold shadow-purple-glow transition-all active:scale-95"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Add your first habit</span>
-              </button>
+              <div className="flex items-center gap-3">
+                {onCopyPreviousHabits && (
+                  <button
+                    type="button"
+                    disabled={isCopyingHabits}
+                    onClick={async () => {
+                      setIsCopyingHabits(true);
+                      try {
+                        await onCopyPreviousHabits();
+                      } finally {
+                        setIsCopyingHabits(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold border border-white/10 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isCopyingHabits ? 'animate-spin' : ''}`} />
+                    <span>{isCopyingHabits ? 'Copying...' : "Copy last month's habits"}</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onAddHabit}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-luma-purple hover:bg-luma-purple-glow text-white text-xs font-semibold shadow-purple-glow transition-all active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Add your first habit</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -520,22 +638,16 @@ export const Tasks: React.FC<TasksProps> = ({
                       <span>{habit.streak_count} day streak</span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onCheckHabitStreak(habit.id);
-                      }}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-                        isCompletedToday
-                          ? 'bg-luma-lime/20 border border-luma-lime/40 text-luma-lime hover:bg-luma-lime/30 shadow-sm'
-                          : 'bg-[#222522] hover:bg-luma-lime hover:text-black text-luma-lime'
-                      }`}
-                      title={isCompletedToday ? 'Completed today! Click to toggle off' : 'Mark completed for today (+1 Streak)'}
-                    >
-                      <CheckCircle2 className={`w-3.5 h-3.5 ${isCompletedToday ? 'fill-luma-lime text-black' : ''}`} />
-                      <span>{isCompletedToday ? 'Done Today' : '+1 Today'}</span>
-                    </button>
+                    {isCompletedToday ? (
+                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-luma-lime/10 border border-luma-lime/30 text-luma-lime shadow-sm">
+                        <CheckCircle2 className="w-3.5 h-3.5 fill-luma-lime text-black" />
+                        <span>Done Today</span>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-mono text-luma-text-dim/60 bg-white/[0.03] px-2.5 py-1 rounded-lg border border-white/5" title="Habits are completed via the Daily Plan page">
+                        Track in Daily Plan
+                      </span>
+                    )}
                   </div>
                 </div>
               );
@@ -548,12 +660,7 @@ export const Tasks: React.FC<TasksProps> = ({
       {/* SECTION 3: WEEKLY GOALS */}
       {activeSection === 'weekly' && (
         <div className="space-y-6">
-          {/* Graphical Visualization: Weekly Velocity & Pacing Trajectory */}
-          <WeeklyGoalVisualizer
-            weeklyGoals={weeklyGoals}
-            activeCategoryFilter={weeklyCategoryFilter}
-            onSelectCategoryFilter={setWeeklyCategoryFilter}
-          />
+
           <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 flex items-center justify-between">
             <div>
               <h3 className="text-base font-semibold text-white mb-1">Weekly Target Goals</h3>
@@ -565,6 +672,25 @@ export const Tasks: React.FC<TasksProps> = ({
               <span className="text-xs font-mono text-luma-lime bg-[#212b10] px-3 py-1.5 rounded-full">
                 Weekly Cadence Active
               </span>
+              {onCopyPreviousWeeklyGoals && (
+                <button
+                  type="button"
+                  disabled={isCopyingWeeklyGoals}
+                  onClick={async () => {
+                    setIsCopyingWeeklyGoals(true);
+                    try {
+                      await onCopyPreviousWeeklyGoals();
+                    } finally {
+                      setIsCopyingWeeklyGoals(false);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium text-xs border border-white/10 transition-all cursor-pointer"
+                  title="Copy weekly goals from last week"
+                >
+                  <RotateCcw className={`w-3.5 h-3.5 ${isCopyingWeeklyGoals ? 'animate-spin' : ''}`} />
+                  <span>{isCopyingWeeklyGoals ? 'Copying...' : 'Copy Last Week'}</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onAddWeeklyGoal}
@@ -575,6 +701,42 @@ export const Tasks: React.FC<TasksProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Minimal Domain Category Filter Row */}
+          {weeklyGoals.length > 0 && (
+            <div className="flex items-center gap-2 px-1 flex-wrap">
+              <span className="text-[11px] font-mono uppercase text-luma-text-dim tracking-wider">
+                Domain Focus:
+              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setWeeklyCategoryFilter('all')}
+                  className={`px-3 py-1 rounded-xl text-xs font-mono transition-all ${
+                    weeklyCategoryFilter === 'all'
+                      ? 'bg-luma-lime text-black font-semibold shadow-lime-glow'
+                      : 'bg-white/[0.04] text-luma-text-muted hover:text-white hover:bg-white/[0.08]'
+                  }`}
+                >
+                  All Goals ({weeklyGoals.length})
+                </button>
+                {weeklyCategories.map((c) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => setWeeklyCategoryFilter(c.name)}
+                    className={`px-3 py-1 rounded-xl text-xs font-mono transition-all ${
+                      weeklyCategoryFilter.toLowerCase() === c.name.toLowerCase()
+                        ? 'bg-white text-black font-semibold shadow-sm'
+                        : 'bg-white/[0.04] text-luma-text-muted hover:text-white hover:bg-white/[0.08]'
+                    }`}
+                  >
+                    {c.name} ({c.count})
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {filteredWeeklyGoals.length === 0 ? (
             <div className="p-12 text-center rounded-3xl border border-dashed border-white/10 bg-[#161716]/60 flex flex-col items-center justify-center my-2">
@@ -587,14 +749,34 @@ export const Tasks: React.FC<TasksProps> = ({
               <p className="text-xs text-luma-text-muted max-w-sm mb-5 leading-relaxed">
                 Set high-leverage weekly targets for your projects, exams, or craft. The timetable scheduler will automatically protect focus blocks to keep you on pace.
               </p>
-              <button
-                type="button"
-                onClick={onAddWeeklyGoal}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-luma-lime hover:bg-luma-lime-hover text-black text-xs font-semibold shadow-lime-glow transition-all active:scale-95"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>New weekly goal</span>
-              </button>
+              <div className="flex items-center gap-3">
+                {onCopyPreviousWeeklyGoals && (
+                  <button
+                    type="button"
+                    disabled={isCopyingWeeklyGoals}
+                    onClick={async () => {
+                      setIsCopyingWeeklyGoals(true);
+                      try {
+                        await onCopyPreviousWeeklyGoals();
+                      } finally {
+                        setIsCopyingWeeklyGoals(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold border border-white/10 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isCopyingWeeklyGoals ? 'animate-spin' : ''}`} />
+                    <span>{isCopyingWeeklyGoals ? 'Copying...' : "Copy previous week's goals"}</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onAddWeeklyGoal}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-luma-lime hover:bg-luma-lime-hover text-black text-xs font-semibold shadow-lime-glow transition-all active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>New weekly goal</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -660,16 +842,9 @@ export const Tasks: React.FC<TasksProps> = ({
                           ✓ Done
                         </span>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onIncrementWeeklyGoal(wg.id, wg.completed_units);
-                          }}
-                          className="text-xs font-mono bg-luma-lime/10 hover:bg-luma-lime hover:text-black text-luma-lime px-3 py-1.5 rounded-xl transition-all font-medium cursor-pointer active:scale-95"
-                        >
-                          +1 {wg.unit_label}
-                        </button>
+                        <span className="text-[11px] font-mono text-luma-text-dim/60 bg-white/[0.03] px-2.5 py-1 rounded-lg border border-white/5" title="Weekly goals progress is tracked via the Daily Plan timetable">
+                          Track in Daily Plan
+                        </span>
                       )}
 
                       <button

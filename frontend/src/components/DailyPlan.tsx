@@ -1,8 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CheckCircle2, Circle, Play, Sparkles, Calendar, Briefcase, History, Compass } from 'lucide-react';
-import { api, Habit, ScheduleBlock, isTimeWithinBlock, Goal, StatsResponse } from '../services/api';
+import {
+  CheckCircle2,
+  Circle,
+  Play,
+  Sparkles,
+  Calendar,
+  Briefcase,
+  History,
+  Compass,
+  Target,
+  Zap,
+  Flame,
+  Sun,
+  Moon,
+  Waves,
+} from 'lucide-react';
+import { api, Habit, WeeklyGoal, ScheduleBlock, isTimeWithinBlock, Goal, StatsResponse } from '../services/api';
 import { getCategoryBadge } from './LearningPaths';
-import { DailyAnchorsCard } from './DailyAnchorsCard';
 
 type DayCode = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
 
@@ -62,6 +76,7 @@ export const computeCurrentWeekDays = (_activeDates: string[] = []): WeekDayItem
 interface DailyPlanProps {
   schedule: ScheduleBlock[];
   habits?: Habit[];
+  weeklyGoals?: WeeklyGoal[];
   goals?: Goal[];
   stats?: StatsResponse | null;
   onToggleStatus: (id: string, dateStr?: string) => void;
@@ -77,6 +92,7 @@ interface DailyPlanProps {
 export const DailyPlan: React.FC<DailyPlanProps> = ({
   schedule,
   habits = [],
+  weeklyGoals = [],
   goals = [],
   stats = null,
   onToggleStatus,
@@ -104,6 +120,17 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
 
   // Date selection state
   const [selectedDateStr, setSelectedDateStr] = useState<string>(() => initialDateStr || todayDateStr);
+
+  type HorizonTab = 'anchors' | 'weekly' | 'long';
+  const [activeHorizonTab, setActiveHorizonTab] = useState<HorizonTab>('anchors');
+
+  const activeHabits = useMemo(() => habits.filter(h => h.is_active), [habits]);
+  const completedHabitsCount = useMemo(() => {
+    return activeHabits.filter(h => h.last_completed_date === todayDateStr).length;
+  }, [activeHabits, todayDateStr]);
+  const habitProgressPercent = activeHabits.length > 0
+    ? Math.round((completedHabitsCount / activeHabits.length) * 100)
+    : 0;
 
   useEffect(() => {
     if (initialDateStr) {
@@ -287,11 +314,12 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                 <span>{item.date}</span>
                 {item.isToday && (
                   <span
-                    className={`w-1.5 h-1.5 rounded-full ${
+                    className={`w-2 h-2 rounded-full ${
                       isSelected
-                        ? 'bg-[#151715] shadow-none'
-                        : 'bg-luma-lime shadow-[0_0_6px_#d4f938] animate-pulse'
+                        ? 'bg-emerald-600 shadow-[0_0_8px_#10b981] ring-2 ring-emerald-500/40 animate-pulse'
+                        : 'bg-luma-lime shadow-[0_0_8px_#d4f938] animate-pulse'
                     }`}
+                    title="Current Date"
                   />
                 )}
               </div>
@@ -327,7 +355,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                     <span>ARCHIVE • {totalProtectedText}</span>
                   </span>
                 ) : (
-                  <span className="text-xs font-mono tracking-wider uppercase text-luma-text-muted">
+                  <span className="text-xs font-mono tracking-wider uppercase text-luma-lime bg-luma-lime/10 border border-luma-lime/25 px-2.5 py-1 rounded-full font-semibold">
                     {totalProtectedText}
                   </span>
                 )
@@ -351,7 +379,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
               <p className="text-xs font-mono text-luma-text-muted">Loading schedule...</p>
             </div>
           ) : activeDaySchedule.length > 0 ? (
-            <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-3 before:bottom-3 before:w-[2px] before:bg-[#252825]">
+            <div className="relative pl-7 space-y-4 before:absolute before:left-[8px] before:top-4 before:bottom-4 before:w-[2px] before:bg-white/10">
               {activeDaySchedule.map((item) => {
                 const isDone = item.status === 'done';
                 const isBreak = item.type === 'break';
@@ -359,7 +387,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
 
                 // Dot colors
                 const dotColor = isCurrentlyActive
-                  ? 'border-luma-lime bg-luma-lime shadow-[0_0_10px_#d4f938]'
+                  ? 'border-luma-lime bg-luma-lime shadow-[0_0_12px_#d4f938]'
                   : isBreak
                   ? 'border-[#d9822b] bg-[#342014]'
                   : isDone
@@ -368,7 +396,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
 
                 // Card styling
                 const cardBg = isCurrentlyActive
-                  ? 'bg-[#1b2618] border-luma-lime shadow-[0_0_15px_rgba(212,249,56,0.18)] text-white'
+                  ? 'bg-[#1b2618] border-l-4 border-l-luma-lime border-y-white/10 border-r-white/10 shadow-[0_0_20px_rgba(212,249,56,0.16)] text-white'
                   : isBreak
                   ? 'bg-[#291a13] border-[#442b1f] text-[#f7ad72]'
                   : isDone
@@ -387,7 +415,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                   <div key={item.id} className="relative flex items-center gap-4 group">
                     {/* Timeline Dot */}
                     <div
-                      className={`absolute -left-[27px] w-3.5 h-3.5 rounded-full border-2 ${dotColor} transition-transform group-hover:scale-125 z-10`}
+                      className={`absolute -left-[25px] w-3.5 h-3.5 rounded-full border-2 ${dotColor} transition-transform group-hover:scale-125 z-10`}
                     />
 
                     {/* Start Time */}
@@ -500,115 +528,18 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
           )}
         </div>
 
-        {/* Right Column: Anchors + Next Protected Block & Why this works (5 cols) */}
+        {/* Right Column: Hero Spotlight + Unified Horizon Radar Hub (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
-          {/* Card 1: Daily Anchors & Lifestyle Targets */}
-          <DailyAnchorsCard habits={habits} onToggleHabit={onToggleHabit || (async () => {})} />
-
-          {/* Card 2: Long view */}
-          <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-base font-semibold text-white tracking-tight">
-                Long view
-              </h2>
-              <span className="text-[11px] font-mono tracking-wider uppercase text-luma-text-muted bg-[#212421] px-2.5 py-1 rounded-full border border-white/5">
-                {goals.length} ACTIVE
-              </span>
-            </div>
-
-            {/* Goal List */}
-            {goals.length > 0 ? (
-              <div className="space-y-4">
-                {goals.map((goal, idx) => {
-                  const progress = Math.min(100, Math.round((goal.covered_units / Math.max(goal.total_units, 1)) * 100));
-
-                  const barColors = [
-                    'bg-luma-purple shadow-[0_0_12px_rgba(123,110,246,0.5)]',
-                    'bg-luma-lime shadow-[0_0_12px_rgba(212,249,56,0.4)]',
-                    'bg-[#f08a5d] shadow-[0_0_12px_rgba(240,138,93,0.4)]',
-                  ];
-                  const barColor = barColors[idx % barColors.length];
-
-                  const target = new Date(goal.target_date).getTime();
-                  const now = new Date().getTime();
-                  const daysLeft = Math.max(0, Math.ceil((target - now) / (1000 * 60 * 60 * 24)));
-
-                  return (
-                    <div
-                      key={goal.id}
-                      onClick={() => {
-                        if (onSelectGoal) onSelectGoal(goal.id);
-                        if (onSelectTab) onSelectTab('learning');
-                      }}
-                      className="p-3 rounded-2xl hover:bg-white/[0.04] border border-transparent hover:border-white/10 cursor-pointer transition-all group"
-                      title="Click to view detailed roadmap in Projects & Goals"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-semibold text-white group-hover:text-luma-lime transition-colors">
-                            {goal.title} →
-                          </span>
-                          {goal.category && (
-                            <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full border ${getCategoryBadge(goal.category).color}`}>
-                              {getCategoryBadge(goal.category).label}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-xs font-mono font-medium text-[#f08a5d]">
-                          {daysLeft} days
-                        </span>
-                      </div>
-
-                      {/* Bar */}
-                      <div className="w-full h-1.5 bg-[#252825] rounded-full overflow-hidden mb-2">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
-
-                      {/* Units & Percent */}
-                      <div className="flex items-center justify-between text-xs font-mono text-luma-text-muted">
-                        <span>
-                          {goal.covered_units} / {goal.total_units} {goal.unit_label}
-                        </span>
-                        <span>{progress}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="py-8 px-4 text-center space-y-3">
-                <div className="w-10 h-10 rounded-2xl bg-[#212421] flex items-center justify-center mx-auto text-luma-text-muted border border-white/5">
-                  <Compass className="w-5 h-5 stroke-[1.5]" />
-                </div>
-                <h3 className="text-sm font-semibold text-white">No active projects or goals</h3>
-                <p className="text-xs text-luma-text-muted max-w-xs mx-auto leading-relaxed">
-                  Configure projects, business initiatives, or exam runways in Projects & Goals.
-                </p>
-                {onSelectTab && (
-                  <button
-                    onClick={() => onSelectTab('learning')}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-xs font-medium text-white border border-white/10 transition-all"
-                  >
-                    <span>Open Projects & Goals →</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Card 3: Next Protected Block Spotlight */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-[#f5f1e8] to-[#e8e2d5] text-luma-cream-text rounded-3xl p-7 shadow-md">
+          {/* 1. Next Protected Block Hero Spotlight (Elevated to top) */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-[#f5f1e8] to-[#e8e2d5] text-luma-cream-text rounded-3xl p-6 sm:p-7 shadow-md">
             {/* Soft decorative background purple blob */}
-            <div className="absolute -bottom-10 -right-10 w-44 h-44 rounded-full bg-[#9f8ff5]/40 blur-2xl pointer-events-none" />
-            <div className="absolute bottom-0 right-0 w-28 h-28 rounded-tl-full bg-[#9f8ff5]/30 pointer-events-none" />
+            <div className="absolute -bottom-10 -right-10 w-44 h-44 rounded-full bg-[#9f8ff5]/35 blur-2xl pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-28 h-28 rounded-tl-full bg-[#9f8ff5]/25 pointer-events-none" />
 
             <div className="relative z-10">
               {activeDaySchedule.length === 0 ? (
                 <>
-                  <div className="text-[10px] font-mono tracking-widest uppercase text-[#5a604f] mb-3">
+                  <div className="text-[10px] font-mono tracking-widest uppercase text-[#5a604f] mb-3 font-semibold">
                     NO COMMITMENTS SCHEDULED
                   </div>
 
@@ -616,25 +547,26 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                     Your canvas is clear.
                   </h3>
 
-                  <p className="text-xs text-[#52574e] mb-6">
+                  <p className="text-xs text-[#52574e] mb-5 leading-relaxed">
                     {isSelectedToday
                       ? 'Add tasks, daily habits, or weekly goals to generate an energy-aligned timetable.'
                       : `No focus blocks scheduled for ${fullDayNames[selectedDayCode]}. Shape this day in advance with AI.`}
                   </p>
 
-                  {activeDaySchedule.length > 0 && onOpenShapeMyDay && (
+                  {onOpenShapeMyDay && (
                     <button
+                      type="button"
                       onClick={() => onOpenShapeMyDay(selectedDateStr)}
-                      className="inline-flex items-center gap-2 bg-[#121312] text-white px-5 py-3 rounded-2xl text-xs font-semibold shadow-md hover:bg-black transition-all"
+                      className="inline-flex items-center gap-2 bg-[#121312] text-white px-5 py-2.5 rounded-2xl text-xs font-semibold shadow-md hover:bg-black transition-all cursor-pointer active:scale-95"
                     >
-                      <Sparkles className="w-4 h-4 text-luma-lime" />
-                      <span>Reshape timetable</span>
+                      <Sparkles className="w-4 h-4 text-luma-lime stroke-[2.2]" />
+                      <span>Shape timetable with AI</span>
                     </button>
                   )}
                 </>
               ) : nextBlock ? (
                 <>
-                  <div className="text-[10px] font-mono tracking-widest uppercase text-[#5a604f] mb-3">
+                  <div className="text-[10px] font-mono tracking-widest uppercase text-[#5a604f] mb-3 font-semibold">
                     NEXT PROTECTED BLOCK · {nextBlock.start_time}
                   </div>
 
@@ -642,13 +574,14 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                     {nextBlock.title.split('·')[0].trim()}, uninterrupted.
                   </h3>
 
-                  <p className="text-xs text-[#52574e] mb-6">
-                    {nextBlock.duration} minutes for {nextBlock.category}.
+                  <p className="text-xs text-[#52574e] mb-5 leading-relaxed">
+                    {nextBlock.duration} minutes reserved for {nextBlock.category || 'deep focus'}.
                   </p>
 
                   <button
+                    type="button"
                     onClick={() => onStartFocus(nextBlock.title, nextBlock.duration, nextBlock.id)}
-                    className="flex items-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-5 py-3 rounded-2xl font-semibold text-xs shadow-md active:scale-95 transition-all"
+                    className="flex items-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-5 py-2.5 rounded-2xl font-semibold text-xs shadow-md active:scale-95 transition-all cursor-pointer"
                   >
                     <Play className="w-3.5 h-3.5 fill-black" />
                     <span>Begin focus session</span>
@@ -656,7 +589,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                 </>
               ) : (
                 <>
-                  <div className="text-[10px] font-mono tracking-widest uppercase text-[#5a604f] mb-3">
+                  <div className="text-[10px] font-mono tracking-widest uppercase text-[#5a604f] mb-3 font-semibold">
                     RHYTHM ACHIEVED · ALL BLOCKS COMPLETED
                   </div>
 
@@ -664,34 +597,374 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                     Outstanding consistency.
                   </h3>
 
-                  <p className="text-xs text-[#52574e] mb-6">
+                  <p className="text-xs text-[#52574e] mb-5 leading-relaxed">
                     All scheduled focus commitments for today have been fulfilled. Time to step away & recharge.
                   </p>
 
-                  <div className="inline-flex items-center gap-2 bg-[#252824] text-luma-lime px-4 py-2.5 rounded-2xl text-xs font-mono font-semibold">
+                  <div className="inline-flex items-center gap-2 bg-[#252824] text-luma-lime px-4 py-2 rounded-2xl text-xs font-mono font-semibold">
                     <span>✓ 100% Kept Today</span>
                   </div>
                 </>
               )}
+
+              {/* Integrated Circadian Energy Alignment Footnote */}
+              <div className="pt-3.5 mt-4 border-t border-black/10 flex items-start gap-2 text-[11px] text-[#4d5249] leading-relaxed">
+                <span className="text-[#2d3a24] font-bold shrink-0">⚡ Energy-aligned:</span>
+                <span>
+                  {activeDaySchedule.length > 0
+                    ? 'Deeper cognitive work sits before coaching. Tactical reviews are scheduled during natural dips.'
+                    : 'Luma aligns focus with your circadian peak, protecting space for habit formation and rest.'}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Card 3: Why this works */}
-          <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6">
-            <div className="text-[10px] font-mono tracking-widest uppercase text-luma-text-dim mb-3">
-              Why this works
+          {/* 2. Unified Horizon Radar Hub (Habits, Weekly Goals, Long View) */}
+          <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 shadow-sm">
+            {/* Segmented Pill Navigation */}
+            <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-white/[0.06] gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#141514] border border-white/5 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setActiveHorizonTab('anchors')}
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                    activeHorizonTab === 'anchors'
+                      ? 'bg-luma-purple text-white shadow-sm font-semibold'
+                      : 'text-luma-text-muted hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Habits</span>
+                  {activeHabits.length > 0 && (
+                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                      activeHorizonTab === 'anchors' ? 'bg-white/20 text-white font-bold' : 'bg-white/5 text-luma-text-dim'
+                    }`}>
+                      {completedHabitsCount}/{activeHabits.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveHorizonTab('weekly')}
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                    activeHorizonTab === 'weekly'
+                      ? 'bg-luma-lime text-black shadow-sm font-semibold'
+                      : 'text-luma-text-muted hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <Target className="w-3.5 h-3.5" />
+                  <span>Weekly Sprint</span>
+                  {weeklyGoals.length > 0 && (
+                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                      activeHorizonTab === 'weekly' ? 'bg-black/20 text-black font-bold' : 'bg-white/5 text-luma-text-dim'
+                    }`}>
+                      {weeklyGoals.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveHorizonTab('long')}
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                    activeHorizonTab === 'long'
+                      ? 'bg-[#3b82f6] text-white shadow-sm font-semibold'
+                      : 'text-luma-text-muted hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <Compass className="w-3.5 h-3.5" />
+                  <span>Long View</span>
+                  {goals.length > 0 && (
+                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                      activeHorizonTab === 'long' ? 'bg-white/20 text-white font-bold' : 'bg-white/5 text-luma-text-dim'
+                    }`}>
+                      {goals.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Sub-label */}
+              <span className="text-[10px] font-mono uppercase tracking-widest text-luma-text-dim hidden sm:inline-block">
+                {activeHorizonTab === 'anchors' ? 'Daily Rituals' : activeHorizonTab === 'weekly' ? '7-Day Target' : 'Runway'}
+              </span>
             </div>
-            <p className="text-xs text-luma-text-muted leading-relaxed">
-              {activeDaySchedule.length > 0 ? (
-                <>
-                  <strong className="text-white font-medium">Energy-aligned:</strong> deeper work sits before coaching. The light review is intentionally saved for your post-lunch dip.
-                </>
-              ) : (
-                <>
-                  <strong className="text-white font-medium">Intentional planning:</strong> Luma aligns deep focus blocks with your natural circadian peak, leaving space for breaks and habit formation once commitments are added.
-                </>
-              )}
-            </p>
+
+            {/* TAB 1: DAILY ANCHORS */}
+            {activeHorizonTab === 'anchors' && (
+              <div className="space-y-4 animate-fadeIn">
+                {/* Progress bar */}
+                {activeHabits.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-mono text-luma-text-muted">
+                      <span>Adherence Today</span>
+                      <span className="text-luma-lime font-bold">{completedHabitsCount}/{activeHabits.length} ({habitProgressPercent}%)</span>
+                    </div>
+                    <div className="w-full bg-[#141514] h-1.5 rounded-full overflow-hidden border border-white/[0.04]">
+                      <div
+                        className="h-full bg-luma-lime transition-all duration-500 shadow-[0_0_8px_rgba(212,249,56,0.3)]"
+                        style={{ width: `${habitProgressPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {activeHabits.length === 0 ? (
+                  <div className="text-center py-8 px-4 text-xs text-luma-text-dim bg-[#141514] rounded-2xl border border-white/[0.04] space-y-2">
+                    <div className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center mx-auto text-luma-text-dim">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <p className="text-white/80 font-medium text-xs">No active daily habits configured</p>
+                    <p className="text-[11px] text-luma-text-muted max-w-xs mx-auto">
+                      Add recurring anchors in Tasks & Cadence to build your daily rhythm.
+                    </p>
+                    {onSelectTab && (
+                      <button
+                        type="button"
+                        onClick={() => onSelectTab('tasks')}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs transition-all cursor-pointer"
+                      >
+                        <span>Open Tasks →</span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
+                    {activeHabits.map((h) => {
+                      const isDone = h.last_completed_date === todayDateStr;
+                      const AnchorIcon = h.anchor === 'morning' ? Sun : h.anchor === 'evening' ? Moon : Waves;
+                      const anchorColor = h.anchor === 'morning' ? 'text-amber-400' : h.anchor === 'evening' ? 'text-luma-purple' : 'text-sky-400';
+
+                      return (
+                        <div
+                          key={h.id}
+                          onClick={() => onToggleHabit && onToggleHabit(h.id)}
+                          className={`flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer group ${
+                            isDone
+                              ? 'bg-[#151c15] border-[#222f21] text-white/70'
+                              : 'bg-[#141514] border-white/[0.04] hover:border-white/20 text-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <button
+                              type="button"
+                              className="shrink-0 transition-transform active:scale-90"
+                            >
+                              {isDone ? (
+                                <CheckCircle2 className="w-4 h-4 text-luma-lime" />
+                              ) : (
+                                <Circle className="w-4 h-4 text-luma-text-dim group-hover:text-white" />
+                              )}
+                            </button>
+
+                            <div className="min-w-0">
+                              <div className={`text-xs font-medium truncate ${isDone ? 'line-through text-white/50' : 'text-white'}`}>
+                                {h.title}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[10px] font-mono text-luma-text-dim mt-0.5">
+                                <span className={`flex items-center gap-1 ${anchorColor} capitalize`}>
+                                  <AnchorIcon className="w-3 h-3" />
+                                  <span>{h.anchor}</span>
+                                </span>
+                                <span>•</span>
+                                {h.habit_type === 'check_off' ? (
+                                  <span className="text-amber-400/90 font-semibold">
+                                    {h.target_value ? `⚡ ${h.target_value}` : '⚡ Ritual'}
+                                  </span>
+                                ) : h.habit_type === 'target' ? (
+                                  <span className="text-sky-400 font-semibold">
+                                    🎯 {h.target_value} {h.target_unit || ''}
+                                  </span>
+                                ) : (
+                                  <span className="text-luma-purple">
+                                    ⏱️ {h.duration_minutes > 0 ? `${h.duration_minutes}m` : 'Session'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Streak */}
+                          <div className="flex items-center gap-1 shrink-0 font-mono text-[11px] text-amber-400 pl-2">
+                            {h.streak_count > 0 ? (
+                              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px]">
+                                <Flame className="w-3 h-3 text-amber-400 fill-amber-400" />
+                                <span>{h.streak_count}d</span>
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-luma-text-dim/60">—</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 2: WEEKLY SPRINT */}
+            {activeHorizonTab === 'weekly' && (
+              <div className="space-y-4 animate-fadeIn">
+                {weeklyGoals.length === 0 ? (
+                  <div className="text-center py-8 px-4 text-xs text-luma-text-dim bg-[#141514] rounded-2xl border border-white/[0.04] space-y-2">
+                    <div className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center mx-auto text-luma-text-dim">
+                      <Target className="w-4 h-4" />
+                    </div>
+                    <p className="text-white/80 font-medium text-xs">No weekly targets set for this week</p>
+                    <p className="text-[11px] text-luma-text-muted max-w-xs mx-auto">
+                      Define weekly milestones in Tasks & Cadence to track pacing across the 7-day week.
+                    </p>
+                    {onSelectTab && (
+                      <button
+                        type="button"
+                        onClick={() => onSelectTab('tasks')}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs transition-all cursor-pointer"
+                      >
+                        <span>Open Tasks →</span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                    {weeklyGoals.map((wg) => {
+                      const progress = wg.progressPercent || Math.min(100, Math.round((wg.completed_units / Math.max(wg.target_units, 1)) * 100));
+                      const isAchieved = wg.completed_units >= wg.target_units;
+
+                      return (
+                        <div
+                          key={wg.id}
+                          className="p-3.5 rounded-2xl bg-[#141514] border border-white/[0.04] hover:border-white/10 transition-all space-y-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-white truncate">
+                              {wg.title}
+                            </span>
+                            {isAchieved ? (
+                              <span className="text-[10px] font-mono font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/30 shrink-0">
+                                ✓ Done
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-mono text-luma-text-dim uppercase tracking-wider shrink-0">
+                                {wg.category || 'Sprint'}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Progress Bar */}
+                          <div className="w-full h-1.5 bg-[#252825] rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                isAchieved
+                                  ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]'
+                                  : 'bg-luma-lime shadow-[0_0_10px_rgba(212,249,56,0.4)]'
+                              }`}
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px] font-mono text-luma-text-muted">
+                            <span>
+                              {wg.completed_units} / {wg.target_units} {wg.unit_label}
+                            </span>
+                            <span className={isAchieved ? 'text-emerald-400 font-semibold' : 'text-white/80'}>{progress}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="text-[10px] font-mono text-luma-text-dim text-center pt-1">
+                      ⚡ Auto-advances when timetable focus blocks are checked off
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 3: LONG VIEW */}
+            {activeHorizonTab === 'long' && (
+              <div className="space-y-4 animate-fadeIn">
+                {goals.length === 0 ? (
+                  <div className="text-center py-8 px-4 text-xs text-luma-text-dim bg-[#141514] rounded-2xl border border-white/[0.04] space-y-2">
+                    <div className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center mx-auto text-luma-text-dim">
+                      <Compass className="w-4 h-4" />
+                    </div>
+                    <p className="text-white/80 font-medium text-xs">No active long-term projects</p>
+                    <p className="text-[11px] text-luma-text-muted max-w-xs mx-auto">
+                      Build syllabus roadmaps and projects in Projects & Goals.
+                    </p>
+                    {onSelectTab && (
+                      <button
+                        type="button"
+                        onClick={() => onSelectTab('learning')}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs transition-all cursor-pointer"
+                      >
+                        <span>Open Projects & Goals →</span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                    {goals.map((goal, idx) => {
+                      const progress = Math.min(100, Math.round((goal.covered_units / Math.max(goal.total_units, 1)) * 100));
+                      const barColors = [
+                        'bg-luma-purple shadow-[0_0_12px_rgba(123,110,246,0.5)]',
+                        'bg-luma-lime shadow-[0_0_12px_rgba(212,249,56,0.4)]',
+                        'bg-[#f08a5d] shadow-[0_0_12px_rgba(240,138,93,0.4)]',
+                      ];
+                      const barColor = barColors[idx % barColors.length];
+
+                      const target = new Date(goal.target_date).getTime();
+                      const now = new Date().getTime();
+                      const daysLeft = Math.max(0, Math.ceil((target - now) / (1000 * 60 * 60 * 24)));
+
+                      return (
+                        <div
+                          key={goal.id}
+                          onClick={() => {
+                            if (onSelectGoal) onSelectGoal(goal.id);
+                            if (onSelectTab) onSelectTab('learning');
+                          }}
+                          className="p-3.5 rounded-2xl bg-[#141514] border border-white/[0.04] hover:border-white/15 cursor-pointer transition-all group space-y-2"
+                          title="Click to view full curriculum in Projects & Goals"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xs font-semibold text-white group-hover:text-luma-lime transition-colors truncate">
+                                {goal.title} →
+                              </span>
+                              {goal.category && (
+                                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full border ${getCategoryBadge(goal.category).color} shrink-0`}>
+                                  {getCategoryBadge(goal.category).label}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] font-mono font-medium text-[#f08a5d] shrink-0">
+                              {daysLeft}d left
+                            </span>
+                          </div>
+
+                          {/* Progress Bar */}
+                          <div className="w-full h-1.5 bg-[#252825] rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px] font-mono text-luma-text-muted">
+                            <span>
+                              {goal.covered_units} / {goal.total_units} {goal.unit_label}
+                            </span>
+                            <span>{progress}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -53,13 +53,16 @@ export const App: React.FC = () => {
   const [isLocked, setIsLocked] = useState(false);
   const [maxCapacityHours, setMaxCapacityHours] = useState(32);
 
+  const getTodayISTStr = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+
   // Load all data
   const loadData = async () => {
     try {
+      const todayDateStr = getTodayISTStr();
       const health = await api.checkHealth();
       if (health.hasPasscode) {
         try {
-          await api.getTasks();
+          await api.getTasks(todayDateStr);
         } catch {
           setIsLocked(true);
           return;
@@ -67,7 +70,7 @@ export const App: React.FC = () => {
       }
 
       const [tasksRes, habitsRes, weeklyRes, goalsRes, schedRes, statsRes] = await Promise.all([
-        api.getTasks().catch(() => ({ success: true, tasks: [] })),
+        api.getTasks(todayDateStr).catch(() => ({ success: true, tasks: [] })),
         api.getHabits().catch(() => ({ success: true, habits: [] })),
         api.getWeeklyGoals().catch(() => ({ success: true, weeklyGoals: [] })),
         api.getGoals().catch(() => ({ success: true, goals: [] })),
@@ -91,27 +94,6 @@ export const App: React.FC = () => {
   }, []);
 
   // Handlers
-  const handleToggleTaskStatus = async (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-    const newStatus = task.status === 'done' ? 'pending' : 'done';
-
-    if (newStatus === 'done') {
-      confetti({ particleCount: 60, spread: 50, origin: { y: 0.7 } });
-    }
-
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
-    setSchedule(prev => prev.map(s => s.task_id === taskId ? { ...s, status: newStatus } : s));
-
-    try {
-      await api.updateTask(taskId, { status: newStatus });
-      const statsRes = await api.getStats();
-      if (statsRes.stats) setStats(statsRes.stats);
-    } catch (err) {
-      console.error('Failed to toggle task:', err);
-      loadData();
-    }
-  };
 
   const handleToggleScheduleStatus = async (scheduleId: string, dateStr?: string) => {
     const block = schedule.find(s => s.id === scheduleId);
@@ -214,6 +196,28 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleCopyPreviousHabits = async () => {
+    try {
+      const res = await api.copyPreviousHabits();
+      if (res.success) {
+        await loadData();
+      }
+    } catch (err: any) {
+      console.error('Failed to copy previous habits:', err);
+    }
+  };
+
+  const handleCopyPreviousWeeklyGoals = async () => {
+    try {
+      const res = await api.copyPreviousWeeklyGoals();
+      if (res.success) {
+        await loadData();
+      }
+    } catch (err: any) {
+      console.error('Failed to copy previous weekly goals:', err);
+    }
+  };
+
   const handleIncrementWeeklyGoal = async (id: string, currentCompleted: number) => {
     const targetGoal = weeklyGoals.find(wg => wg.id === id);
     if (targetGoal && currentCompleted >= targetGoal.target_units) {
@@ -240,6 +244,7 @@ export const App: React.FC = () => {
         energy_level: 'light',
         category: 'Daily To-Do',
         column_bucket: 'now',
+        task_date: getTodayISTStr(),
       });
       if (res.task) {
         setTasks(prev => [...prev, res.task]);
@@ -315,7 +320,10 @@ export const App: React.FC = () => {
           setTasks(prev => prev.map(t => t.id === editingTask.id ? res.task : t));
         }
       } else {
-        const res = await api.createTask(taskData);
+        const res = await api.createTask({
+          ...taskData,
+          task_date: taskData.task_date || getTodayISTStr(),
+        });
         if (res.task) {
           setTasks(prev => [...prev, res.task]);
         }
@@ -398,7 +406,6 @@ export const App: React.FC = () => {
             setCurrentTab('daily');
           }}
           onToggleScheduleStatus={handleToggleScheduleStatus}
-          onToggleHabit={handleCheckHabitStreak}
           onOpenShapeMyDay={(targetDate) => {
             setShapeTargetDate(targetDate);
             setIsShapeMyDayOpen(true);
@@ -413,6 +420,7 @@ export const App: React.FC = () => {
         <DailyPlan
           schedule={schedule}
           habits={habits}
+          weeklyGoals={weeklyGoals}
           goals={goals}
           stats={stats}
           initialDateStr={selectedDailyPlanDate}
@@ -445,16 +453,16 @@ export const App: React.FC = () => {
           weeklyGoals={weeklyGoals}
           onAddTask={() => { setEditingTask(null); setIsTaskModalOpen(true); }}
           onEditTask={(task) => { setEditingTask(task); setIsTaskModalOpen(true); }}
-          onToggleStatus={handleToggleTaskStatus}
           onAddHabit={() => { setEditingHabit(null); setIsHabitModalOpen(true); }}
           onEditHabit={(habit) => { setEditingHabit(habit); setIsHabitModalOpen(true); }}
-          onCheckHabitStreak={handleCheckHabitStreak}
           onDeleteHabit={handleDeleteHabit}
           onAddWeeklyGoal={() => { setEditingWeeklyGoal(null); setIsWeeklyGoalModalOpen(true); }}
           onEditWeeklyGoal={(goal) => { setEditingWeeklyGoal(goal); setIsWeeklyGoalModalOpen(true); }}
           onDeleteWeeklyGoal={handleDeleteWeeklyGoal}
           onQuickAddTodo={handleQuickAddTodo}
           onIncrementWeeklyGoal={handleIncrementWeeklyGoal}
+          onCopyPreviousHabits={handleCopyPreviousHabits}
+          onCopyPreviousWeeklyGoals={handleCopyPreviousWeeklyGoals}
           onOpenShapeMyDay={() => setIsShapeMyDayOpen(true)}
         />
       )}

@@ -7,10 +7,25 @@ export const tasksRouter = new Hono<{ Bindings: Env }>();
 // GET /api/tasks
 tasksRouter.get('/', async (c) => {
   try {
-    const { results } = await c.env.DB.prepare(
-      'SELECT * FROM tasks ORDER BY created_at ASC'
-    ).all<Task>();
-    return c.json({ success: true, tasks: results || [] });
+    const dateParam = c.req.query('date');
+    const allParam = c.req.query('all');
+    const todayIST = getTodayIST();
+
+    let results: Task[];
+    if (allParam === 'true') {
+      const res = await c.env.DB.prepare(
+        'SELECT * FROM tasks ORDER BY created_at ASC'
+      ).all<Task>();
+      results = res.results || [];
+    } else {
+      const targetDate = dateParam || todayIST;
+      const res = await c.env.DB.prepare(
+        'SELECT * FROM tasks WHERE task_date = ? OR (task_date IS NULL AND date(created_at) = ?) ORDER BY created_at ASC'
+      ).bind(targetDate, targetDate).all<Task>();
+      results = res.results || [];
+    }
+
+    return c.json({ success: true, tasks: results });
   } catch (err: any) {
     return c.json({ success: false, error: err.message }, 500);
   }
@@ -36,13 +51,14 @@ tasksRouter.post('/', async (c) => {
     const category = body.category || 'General';
     const goal_id = body.goal_id || null;
     const column_bucket = body.column_bucket || 'now';
+    const task_date = body.task_date || getTodayIST();
 
     await c.env.DB.prepare(
-      `INSERT INTO tasks (id, title, type, duration_minutes, priority, energy_level, status, scheduled_start, scheduled_end, category, goal_id, column_bucket)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO tasks (id, title, type, duration_minutes, priority, energy_level, status, scheduled_start, scheduled_end, category, goal_id, column_bucket, task_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       id, title, type, duration_minutes, priority, energy_level, status,
-      scheduled_start, scheduled_end, category, goal_id, column_bucket
+      scheduled_start, scheduled_end, category, goal_id, column_bucket, task_date
     ).run();
 
     const task = await c.env.DB.prepare('SELECT * FROM tasks WHERE id = ?').bind(id).first<Task>();
@@ -74,15 +90,16 @@ tasksRouter.patch('/:id', async (c) => {
     const category = body.category !== undefined ? body.category : current.category;
     const goal_id = body.goal_id !== undefined ? body.goal_id : current.goal_id;
     const column_bucket = body.column_bucket !== undefined ? body.column_bucket : current.column_bucket;
+    const task_date = body.task_date !== undefined ? body.task_date : current.task_date;
 
     await c.env.DB.prepare(
       `UPDATE tasks SET
         title = ?, type = ?, duration_minutes = ?, priority = ?, energy_level = ?,
-        status = ?, scheduled_start = ?, scheduled_end = ?, category = ?, goal_id = ?, column_bucket = ?
+        status = ?, scheduled_start = ?, scheduled_end = ?, category = ?, goal_id = ?, column_bucket = ?, task_date = ?
        WHERE id = ?`
     ).bind(
       title, type, duration_minutes, priority, energy_level,
-      status, scheduled_start, scheduled_end, category, goal_id, column_bucket, id
+      status, scheduled_start, scheduled_end, category, goal_id, column_bucket, task_date, id
     ).run();
 
     const updated = await c.env.DB.prepare('SELECT * FROM tasks WHERE id = ?').bind(id).first<Task>();

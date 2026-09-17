@@ -11,6 +11,7 @@ export interface Task {
   category: string | null;
   goal_id: string | null;
   column_bucket: 'now' | 'up_next' | 'later';
+  task_date?: string | null;
   created_at: string;
 }
 
@@ -33,6 +34,7 @@ export interface Habit {
   last_completed_date?: string;
   frequency_type?: FrequencyType;
   frequency_value?: number;
+  month?: string;
 }
 
 export interface WeeklyGoal {
@@ -225,7 +227,13 @@ export const api = {
     }),
 
   // Tasks (Daily To-Dos)
-  getTasks: () => request<{ success: boolean; tasks: Task[] }>('/api/tasks'),
+  getTasks: (date?: string, all?: boolean) => {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    if (all) params.append('all', 'true');
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<{ success: boolean; tasks: Task[] }>(`/api/tasks${query}`);
+  },
 
   createTask: (task: Partial<Task>) =>
     request<{ success: boolean; task: Task }>('/api/tasks', {
@@ -245,7 +253,30 @@ export const api = {
     }),
 
   // Monthly Habits
-  getHabits: () => request<{ success: boolean; habits: Habit[] }>('/api/habits'),
+  getHabits: (month?: string) => {
+    const query = month ? `?month=${month}` : '';
+    return request<{ success: boolean; habits: Habit[]; month: string }>(`/api/habits${query}`);
+  },
+
+  getHabitHeatmap: (month?: string) => {
+    const query = month ? `?month=${month}` : '';
+    return request<{ success: boolean; month: string; completions: Record<string, number> }>(`/api/habits/heatmap${query}`);
+  },
+
+  getMonthlyHabitPoints: (month?: string) => {
+    const query = month ? `?month=${month}` : '';
+    return request<{
+      success: boolean;
+      month: string;
+      totalHabits: number;
+      points: { day: number; date: string; points: number; maxPoints: number; percentage: number }[];
+    }>(`/api/habits/monthly-points${query}`);
+  },
+
+  copyPreviousHabits: () =>
+    request<{ success: boolean; habits: Habit[]; count: number }>('/api/habits/copy-previous', {
+      method: 'POST',
+    }),
 
   createHabit: (habit: Partial<Habit>) =>
     request<{ success: boolean; habit: Habit }>('/api/habits', {
@@ -270,7 +301,15 @@ export const api = {
     }),
 
   // Weekly Goals
-  getWeeklyGoals: () => request<{ success: boolean; weeklyGoals: WeeklyGoal[] }>('/api/weekly-goals'),
+  getWeeklyGoals: (weekStart?: string) => {
+    const query = weekStart ? `?week_start=${weekStart}` : '';
+    return request<{ success: boolean; weeklyGoals: WeeklyGoal[]; weekStart: string; weekEnd: string }>(`/api/weekly-goals${query}`);
+  },
+
+  copyPreviousWeeklyGoals: () =>
+    request<{ success: boolean; weeklyGoals: WeeklyGoal[]; count: number }>('/api/weekly-goals/copy-previous', {
+      method: 'POST',
+    }),
 
   createWeeklyGoal: (goal: Partial<WeeklyGoal>) =>
     request<{ success: boolean; weeklyGoal: WeeklyGoal }>('/api/weekly-goals', {
@@ -355,6 +394,15 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ status, date }),
     }),
+
+  getMonthlyTaskPoints: (month?: string) => {
+    const query = month ? `?month=${month}` : '';
+    return request<{
+      success: boolean;
+      month: string;
+      points: { day: number; date: string; points: number; totalTasks: number; percentage: number }[];
+    }>(`/api/schedule/monthly-task-points${query}`);
+  },
 
   // Stats
   getStats: () => request<{ success: boolean; stats: StatsResponse }>('/api/stats'),
