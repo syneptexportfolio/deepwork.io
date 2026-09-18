@@ -93,11 +93,6 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
     return points.reduce((sum, p) => sum + p.points, 0);
   }, [points]);
 
-  const peakPoint = useMemo(() => {
-    if (points.length === 0) return null;
-    return points.reduce((max, p) => (p.points > max.points ? p : max), points[0]);
-  }, [points]);
-
   const activeDaysWithPoints = useMemo(() => {
     return points.filter((p) => p.points > 0).length;
   }, [points]);
@@ -183,14 +178,12 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
                 {totalScored} <span className="text-xs font-normal text-luma-text-dim">{yUnitLabel}</span>
               </div>
             </div>
-            {peakPoint && peakPoint.points > 0 && (
-              <div className="hidden sm:block border-l border-white/10 pl-3">
-                <div className="text-[10px] font-mono uppercase text-luma-text-dim">Peak Day</div>
-                <div className={`text-base font-bold font-mono ${isLime ? 'text-luma-lime' : 'text-luma-purple'}`}>
-                  {peakPoint.points} <span className="text-xs font-normal text-luma-text-dim">(Day {peakPoint.day})</span>
-                </div>
+            <div className="hidden sm:block border-l border-white/10 pl-3">
+              <div className="text-[10px] font-mono uppercase text-luma-text-dim">Active Days</div>
+              <div className={`text-base font-bold font-mono ${isLime ? 'text-luma-lime' : 'text-luma-purple'}`}>
+                {activeDaysWithPoints} <span className="text-xs font-normal text-luma-text-dim">/ {points.length}d</span>
               </div>
-            )}
+            </div>
           </div>
         </div>
 
@@ -222,7 +215,7 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
           )}
 
           <div className="text-[10px] font-mono text-luma-text-dim">
-            Active: <span className="text-white font-medium">{activeDaysWithPoints}d</span>
+            Consistency: <span className="text-white font-medium">{points.length > 0 ? Math.round((activeDaysWithPoints / points.length) * 100) : 0}%</span>
           </div>
         </div>
 
