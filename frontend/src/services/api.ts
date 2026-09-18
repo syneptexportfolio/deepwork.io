@@ -46,6 +46,14 @@ export function extractTimeFromText(text: string): string | null {
   return null;
 }
 
+export function getTimeBucket(timeStr?: string | null): 'now' | 'up_next' | 'later' {
+  if (!timeStr || !timeStr.includes(':')) return 'now';
+  const clean = timeStr.trim().slice(0, 5);
+  if (clean >= '17:00') return 'later';     // 5:00 PM onwards -> Evening
+  if (clean >= '12:00') return 'up_next';   // 12:00 PM to 4:59 PM -> Afternoon
+  return 'now';                             // Before 12:00 PM -> Morning
+}
+
 export type HabitType = 'timed' | 'check_off' | 'target';
 export type FrequencyType = 'days' | 'interval' | 'weekly_target';
 

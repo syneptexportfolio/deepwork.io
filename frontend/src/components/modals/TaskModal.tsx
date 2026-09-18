@@ -13,7 +13,7 @@ import {
   Minus,
   Plus,
 } from 'lucide-react';
-import { Task, extractTimeFromText } from '../../services/api';
+import { Task, extractTimeFromText, getTimeBucket } from '../../services/api';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -185,12 +185,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       const detected = !scheduledStart ? extractTimeFromText(title.trim()) : null;
       const finalScheduledStart = scheduledStart || detected || null;
       let finalCategory = category.trim() || 'General';
-      let finalBucket = columnBucket;
+      let finalBucket = finalScheduledStart ? getTimeBucket(finalScheduledStart) : columnBucket;
       let finalEnergy = energyLevel;
 
       if (finalScheduledStart && finalScheduledStart >= '17:00') {
         if (finalCategory === 'Project' || finalCategory === 'General') finalCategory = 'Personal & Social';
-        if (finalBucket === 'now') finalBucket = 'later';
+        finalBucket = 'later';
         if (finalEnergy === 'deep_focus') finalEnergy = 'light';
       }
 

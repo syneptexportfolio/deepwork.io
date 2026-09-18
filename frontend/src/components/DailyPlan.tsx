@@ -17,7 +17,7 @@ import {
   Plus,
   Minus,
 } from 'lucide-react';
-import { api, Habit, WeeklyGoal, ScheduleBlock, isTimeWithinBlock, Goal, Task } from '../services/api';
+import { api, Habit, WeeklyGoal, ScheduleBlock, isTimeWithinBlock, Goal, Task, getTimeBucket } from '../services/api';
 import { getCategoryBadge } from './LearningPaths';
 import { AddTimelineTaskModal, insertAndReflowSchedule } from './modals/AddTimelineTaskModal';
 
@@ -284,18 +284,6 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
     const taskId = `task-${Date.now()}`;
     const blockId = `block-${Date.now()}`;
 
-    const taskRecord: Partial<Task> = {
-      id: taskId,
-      title,
-      duration_minutes: isUntimed ? 0 : duration,
-      priority,
-      category,
-      energy_level: (startTime && startTime >= '17:00') || category === 'Personal & Social' ? 'light' : 'deep_focus',
-      status: 'pending',
-      scheduled_start: startTime || null,
-      column_bucket: 'now',
-    };
-
     const updatedSchedule = insertAndReflowSchedule({
       currentBlocks: activeDaySchedule,
       newTask: {
@@ -313,6 +301,22 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
       isToday: isSelectedToday,
       currentHHMM,
     });
+
+    const placedBlock = updatedSchedule.find(b => b.id === blockId);
+    const finalStartTime = startTime || placedBlock?.start_time || null;
+    const computedBucket = getTimeBucket(finalStartTime);
+
+    const taskRecord: Partial<Task> = {
+      id: taskId,
+      title,
+      duration_minutes: isUntimed ? 0 : duration,
+      priority,
+      category,
+      energy_level: (finalStartTime && finalStartTime >= '17:00') || category === 'Personal & Social' ? 'light' : 'deep_focus',
+      status: 'pending',
+      scheduled_start: finalStartTime,
+      column_bucket: computedBucket,
+    };
 
     // 1. Optimistically update local scheduleMap
     setScheduleMap(prev => ({

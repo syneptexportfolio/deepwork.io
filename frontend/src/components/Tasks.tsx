@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Minus, Flame, Sun, Waves, Moon, CheckCircle2, ArrowRight, Trash2, Pencil, RotateCcw, Target, Clock, Trophy, Calendar } from 'lucide-react';
-import { Habit, Task, WeeklyGoal } from '../services/api';
+import { Habit, Task, WeeklyGoal, getTimeBucket } from '../services/api';
 
 import { normalizeHabitDays, WEEK_DAYS_CONFIG } from './modals/HabitModal';
 
@@ -83,9 +83,16 @@ export const Tasks: React.FC<TasksProps> = ({
     return Object.entries(counts).map(([name, count]) => ({ name, count }));
   }, [weeklyGoals]);
 
-  const morningTasks = filteredTasks.filter(t => t.column_bucket === 'now' || (t as any).column_bucket === 'morning');
-  const afternoonTasks = filteredTasks.filter(t => t.column_bucket === 'up_next' || (t as any).column_bucket === 'afternoon');
-  const eveningTasks = filteredTasks.filter(t => t.column_bucket === 'later' || (t as any).column_bucket === 'evening');
+  const getTaskBucket = (task: Task): 'now' | 'up_next' | 'later' => {
+    if (task.scheduled_start) {
+      return getTimeBucket(task.scheduled_start);
+    }
+    return task.column_bucket || 'now';
+  };
+
+  const morningTasks = filteredTasks.filter(t => getTaskBucket(t) === 'now');
+  const afternoonTasks = filteredTasks.filter(t => getTaskBucket(t) === 'up_next');
+  const eveningTasks = filteredTasks.filter(t => getTaskBucket(t) === 'later');
 
   const handleQuickSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

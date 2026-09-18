@@ -394,6 +394,12 @@ scheduleRouter.post('/custom-block', async (c) => {
 
     // 1. If task data is provided, persist it in the tasks table to protect it from pruning & support cross-view tracking
     if (task && task.id && task.title) {
+      let bucket = task.column_bucket;
+      if (!bucket && task.scheduled_start) {
+        bucket = task.scheduled_start >= '17:00' ? 'later' : task.scheduled_start >= '12:00' ? 'up_next' : 'now';
+      }
+      if (!bucket) bucket = 'now';
+
       const existingTask = await c.env.DB.prepare('SELECT id FROM tasks WHERE id = ?').bind(task.id).first();
       if (existingTask) {
         await c.env.DB.prepare(`
@@ -406,6 +412,7 @@ scheduleRouter.post('/custom-block', async (c) => {
             scheduled_start = ?,
             scheduled_end = ?,
             category = ?,
+            column_bucket = ?,
             task_date = ?
           WHERE id = ?
         `).bind(
@@ -417,6 +424,7 @@ scheduleRouter.post('/custom-block', async (c) => {
           task.scheduled_start || null,
           task.scheduled_end || null,
           task.category || 'General',
+          bucket,
           targetDate,
           task.id
         ).run();
@@ -436,7 +444,7 @@ scheduleRouter.post('/custom-block', async (c) => {
           task.scheduled_end || null,
           task.category || 'General',
           null,
-          task.column_bucket || 'now',
+          bucket,
           targetDate
         ).run();
       }

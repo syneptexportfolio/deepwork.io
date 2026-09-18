@@ -48,9 +48,15 @@ tasksRouter.post('/', async (c) => {
     let category = body.category || 'General';
     let column_bucket = body.column_bucket || 'now';
 
-    if (scheduled_start && scheduled_start >= '17:00') {
-      if (category === 'General') category = 'Personal & Social';
-      if (column_bucket === 'now') column_bucket = 'later';
+    if (scheduled_start) {
+      if (scheduled_start >= '17:00') {
+        if (category === 'General') category = 'Personal & Social';
+        column_bucket = 'later';
+      } else if (scheduled_start >= '12:00') {
+        column_bucket = 'up_next';
+      } else {
+        column_bucket = 'now';
+      }
     }
 
     const type = body.type || 'daily';
