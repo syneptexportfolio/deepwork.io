@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Minus, Flame, Sun, Waves, Moon, CheckCircle2, ArrowRight, Trash2, Pencil, RotateCcw, Target, Clock, Sparkles, Trophy, Calendar } from 'lucide-react';
+import { Plus, Minus, Flame, Sun, Waves, Moon, CheckCircle2, ArrowRight, Trash2, Pencil, RotateCcw, Target, Clock, Trophy, Calendar } from 'lucide-react';
 import { Habit, Task, WeeklyGoal } from '../services/api';
 
 import { normalizeHabitDays, WEEK_DAYS_CONFIG } from './modals/HabitModal';
@@ -47,7 +47,7 @@ export const Tasks: React.FC<TasksProps> = ({
   onUpdateWeeklyGoalProgress,
   onCopyPreviousHabits,
   onCopyPreviousWeeklyGoals,
-  onOpenShapeMyDay,
+  onOpenShapeMyDay: _onOpenShapeMyDay,
 }) => {
   const [activeSection, setActiveSection] = useState<SectionTab>('todos');
   const [isCopyingHabits, setIsCopyingHabits] = useState(false);
@@ -183,16 +183,6 @@ export const Tasks: React.FC<TasksProps> = ({
 
         {/* Dynamic Action Buttons */}
         <div className="flex items-center gap-3 flex-wrap">
-          {onOpenShapeMyDay && (
-            <button
-              onClick={onOpenShapeMyDay}
-              className="flex items-center gap-2 bg-[#202518] hover:bg-[#2b3320] border border-luma-lime/30 text-luma-lime px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm active:scale-95 transition-all"
-            >
-              <Sparkles className="w-4 h-4 stroke-[2.2]" />
-              <span>Shape my day</span>
-            </button>
-          )}
-
           {activeSection === 'todos' && (
             <button
               onClick={onAddTask}
