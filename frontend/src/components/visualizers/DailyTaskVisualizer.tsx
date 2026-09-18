@@ -86,15 +86,15 @@ export const DailyTaskVisualizer: React.FC<DailyTaskVisualizerProps> = ({
     : circumference;
 
   return (
-    <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 relative overflow-hidden transition-all shadow-md">
+    <div className="bg-luma-card border border-luma-card-border rounded-2xl xs:rounded-3xl p-3.5 xs:p-5 sm:p-6 relative overflow-hidden transition-all shadow-md">
       {/* Soft atmospheric gradient glow */}
       <div className="absolute -top-16 -right-16 w-52 h-52 rounded-full bg-luma-lime/5 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-16 -left-16 w-52 h-52 rounded-full bg-luma-purple/5 blur-3xl pointer-events-none" />
 
       {/* Main Grid: Circular Ring (Left) + Velocity & Energy Breakdown (Right) */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 sm:gap-6 items-center">
         {/* Col 1: Circular Progress Gauge (4 cols) */}
-        <div className="md:col-span-4 flex items-center gap-5 border-b md:border-b-0 md:border-r border-white/[0.06] pb-5 md:pb-0 md:pr-6">
+        <div className="md:col-span-4 flex flex-col xs:flex-row items-center xs:items-start md:items-center gap-3.5 xs:gap-4 sm:gap-5 border-b md:border-b-0 md:border-r border-white/[0.06] pb-4 sm:pb-5 md:pb-0 md:pr-6 text-center xs:text-left">
           <div className="relative shrink-0 flex items-center justify-center">
             <svg width={size} height={size} className="transform -rotate-90">
               <defs>
@@ -154,7 +154,7 @@ export const DailyTaskVisualizer: React.FC<DailyTaskVisualizerProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center sm:justify-start gap-2">
               <span className="text-xs font-mono tracking-wider uppercase text-luma-lime font-bold">
                 Daily Horizon
               </span>
@@ -165,7 +165,7 @@ export const DailyTaskVisualizer: React.FC<DailyTaskVisualizerProps> = ({
             <h3 className="text-base font-semibold text-white tracking-tight">
               Today's Velocity
             </h3>
-            <p className="text-xs text-luma-text-muted leading-relaxed max-w-xs">
+            <p className="text-xs text-luma-text-muted leading-relaxed max-w-xs mx-auto sm:mx-0">
               {daylightStatus.desc}
             </p>
           </div>
@@ -175,8 +175,8 @@ export const DailyTaskVisualizer: React.FC<DailyTaskVisualizerProps> = ({
         <div className="md:col-span-8 space-y-4">
           {/* Energy Distribution Bar */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs font-mono">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs font-mono">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                 <span className="text-white font-medium flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-luma-purple inline-block" />
                   <span>Deep Focus: {Math.floor(deepFocusMins / 60)}h {deepFocusMins % 60}m</span>

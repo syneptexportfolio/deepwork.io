@@ -132,25 +132,25 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
   return (
     <div className="space-y-8 animate-fadeIn">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
         <div>
-          <div className="text-[11px] font-mono tracking-widest uppercase text-luma-text-dim mb-1">
+          <div className="text-[10px] xs:text-[11px] font-mono tracking-widest uppercase text-luma-text-dim mb-1">
             Deadline-Aware Execution
           </div>
-          <h1 className="text-4xl md:text-5xl font-serif text-white tracking-tight mb-2">
+          <h1 className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl font-serif text-white tracking-tight mb-1.5 xs:mb-2">
             Projects & Goals
           </h1>
-          <p className="text-sm text-luma-text-muted">
+          <p className="text-xs sm:text-sm text-luma-text-muted">
             Every long-term milestone has a next best move.
           </p>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 xs:gap-2 flex-wrap">
           {onDeletePath && (
             isConfirmingDelete ? (
-              <div className="flex items-center gap-1.5 bg-[#2a1717] border border-red-500/30 px-3 py-1.5 rounded-2xl animate-fadeIn">
-                <span className="text-[11px] font-mono text-red-300">Delete?</span>
+              <div className="flex items-center gap-1.5 bg-[#2a1717] border border-red-500/30 px-2.5 xs:px-3 py-1.5 rounded-xl xs:rounded-2xl animate-fadeIn">
+                <span className="text-[10px] xs:text-[11px] font-mono text-red-300">Delete?</span>
                 <button
                   type="button"
                   disabled={isDeleting}
@@ -163,14 +163,14 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
                       setIsConfirmingDelete(false);
                     }
                   }}
-                  className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-xl text-[10px] font-semibold transition-all disabled:opacity-50"
+                  className="bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-50 cursor-pointer"
                 >
-                  {isDeleting ? 'Deleting...' : 'Confirm Delete'}
+                  {isDeleting ? 'Deleting...' : 'Confirm'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsConfirmingDelete(false)}
-                  className="text-luma-text-muted hover:text-white px-1.5 py-0.5 text-xs transition-colors"
+                  className="text-luma-text-muted hover:text-white px-1 py-0.5 text-xs transition-colors cursor-pointer"
                 >
                   ✕
                 </button>
@@ -179,7 +179,7 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
               <button
                 type="button"
                 onClick={() => setIsConfirmingDelete(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-luma-card border border-luma-card-border hover:border-red-500/30 hover:bg-red-500/10 text-xs font-medium text-luma-text-dim hover:text-red-400 transition-all"
+                className="flex items-center gap-1.5 px-3 xs:px-3.5 py-2 xs:py-2.5 rounded-xl xs:rounded-2xl bg-luma-card border border-luma-card-border hover:border-red-500/30 hover:bg-red-500/10 text-[11px] xs:text-xs font-medium text-luma-text-dim hover:text-red-400 transition-all cursor-pointer"
                 title="Delete this project or goal"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -190,17 +190,17 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
 
           <button
             onClick={onNewPath}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-luma-card border border-luma-card-border hover:bg-white/[0.04] text-xs font-medium text-white transition-all"
+            className="flex items-center gap-1.5 xs:gap-2 px-3.5 xs:px-4 py-2 xs:py-2.5 rounded-xl xs:rounded-2xl bg-luma-card border border-luma-card-border hover:bg-white/[0.04] text-[11px] xs:text-xs font-medium text-white transition-all cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 text-luma-text-muted" />
-            <span>New project / goal</span>
+            <span>New path</span>
           </button>
         </div>
       </div>
 
       {/* Goal Selector Pills (if multiple goals) */}
       {goals.length > 1 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <div className="flex items-center gap-1.5 xs:gap-2 overflow-x-auto pb-1 scrollbar-none flex-nowrap">
           {goals.map((g) => {
             const badge = getCategoryBadge(g.category);
             const isSelected = g.id === activeGoal.id;
@@ -212,14 +212,14 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
                   setInternalGoalId(g.id);
                   if (onSelectGoalId) onSelectGoalId(g.id);
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-all shrink-0 ${
+                className={`flex items-center gap-1.5 xs:gap-2 px-3 xs:px-4 py-1.5 xs:py-2 rounded-full text-[11px] xs:text-xs font-medium transition-all shrink-0 cursor-pointer ${
                   isSelected
                     ? 'bg-luma-cream text-luma-cream-text font-semibold shadow-sm'
                     : 'bg-luma-card border border-luma-card-border text-luma-text-muted hover:text-white'
                 }`}
               >
-                <span>{g.title}</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full border ${badge.color}`}>
+                <span className="truncate max-w-[140px] xs:max-w-[200px]">{g.title}</span>
+                <span className={`text-[8.5px] xs:text-[9px] font-mono px-1.5 py-0.5 rounded-full border ${badge.color}`}>
                   {badge.label}
                 </span>
               </button>
@@ -231,11 +231,11 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
       {/* Main Two-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Syllabus / Roadmap & Donut Progress (7 cols) */}
-        <div className="lg:col-span-7 bg-luma-card border border-luma-card-border rounded-3xl p-6">
+        <div className="lg:col-span-7 bg-luma-card border border-luma-card-border rounded-3xl p-3.5 xs:p-4 sm:p-6">
           {/* Donut and Title Header */}
-          <div className="flex items-center gap-6 mb-8">
+          <div className="flex flex-col xs:flex-row items-center xs:items-center text-center xs:text-left gap-3 xs:gap-4 sm:gap-6 mb-5 xs:mb-6 sm:mb-8">
             {/* SVG Circular Progress Ring */}
-            <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
+            <div className="relative w-20 h-20 xs:w-24 xs:h-24 shrink-0 flex items-center justify-center">
               <svg className="w-full h-full -rotate-90">
                 <circle
                   cx="48"
@@ -256,33 +256,33 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-lg font-bold font-mono text-white">
+                <span className="text-base xs:text-lg font-bold font-mono text-white">
                   {progressPercent}%
                 </span>
               </div>
             </div>
 
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <h2 className="text-xl font-semibold text-white tracking-tight">
+            <div className="min-w-0">
+              <div className="flex items-center justify-center xs:justify-start gap-2 mb-1.5 flex-wrap">
+                <h2 className="text-lg xs:text-xl font-semibold text-white tracking-tight truncate">
                   {activeGoal.title}
                 </h2>
-                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${categoryBadge.color}`}>
+                <span className={`text-[9px] xs:text-[10px] font-mono px-2 py-0.5 rounded-full border ${categoryBadge.color} shrink-0`}>
                   {categoryBadge.label}
                 </span>
               </div>
-              <p className="text-xs text-luma-text-muted font-mono">
+              <p className="text-[11px] xs:text-xs text-luma-text-muted font-mono">
                 {daysRemaining} days remaining · {effectiveCoveredUnits} of {effectiveTotalUnits} {activeGoal.unit_label} complete
               </p>
             </div>
           </div>
 
           {/* Checklist Header */}
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/[0.06]">
-            <span className="text-xs font-mono uppercase tracking-wider text-luma-text-dim">
+          <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-white/[0.06]">
+            <span className="text-[11px] xs:text-xs font-mono uppercase tracking-wider text-luma-text-dim">
               {checklistTitle}
             </span>
-            <span className="text-xs font-mono text-luma-text-muted">
+            <span className="text-[11px] xs:text-xs font-mono text-luma-text-muted">
               {coveredTopicsCount} / {totalTopicsCount} DONE
             </span>
           </div>
@@ -300,26 +300,26 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
                   <div
                     key={topic.id}
                     onClick={() => onToggleTopic(activeGoal.id, topic.id)}
-                    className="flex items-center justify-between py-3.5 px-3 rounded-xl hover:bg-white/[0.02] border-b border-white/[0.04] last:border-b-0 cursor-pointer transition-colors group"
+                    className="flex items-center justify-between py-2.5 xs:py-3.5 px-2 xs:px-3 rounded-xl hover:bg-white/[0.02] border-b border-white/[0.04] last:border-b-0 cursor-pointer transition-colors group gap-2"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5 xs:gap-3 min-w-0 flex-1">
                       {isCovered ? (
-                        <div className="w-4 h-4 rounded-full border border-luma-text-muted flex items-center justify-center">
+                        <div className="w-4 h-4 rounded-full border border-luma-text-muted flex items-center justify-center shrink-0">
                           <Check className="w-2.5 h-2.5 text-white" />
                         </div>
                       ) : isDueToday ? (
-                        <RefreshCw className="w-4 h-4 text-luma-purple animate-spin-slow" />
+                        <RefreshCw className="w-4 h-4 text-luma-purple animate-spin-slow shrink-0" />
                       ) : (
-                        <Circle className="w-4 h-4 text-luma-text-dim group-hover:text-white" />
+                        <Circle className="w-4 h-4 text-luma-text-dim group-hover:text-white shrink-0" />
                       )}
 
-                      <span className={`text-sm font-medium ${isCovered ? 'text-luma-text-muted line-through opacity-70' : 'text-white'}`}>
+                      <span className={`text-xs xs:text-sm font-medium truncate ${isCovered ? 'text-luma-text-muted line-through opacity-70' : 'text-white'}`}>
                         {topic.name}
                       </span>
                     </div>
 
                     <span
-                      className={`text-[10px] font-mono uppercase tracking-wider ${
+                      className={`text-[9px] xs:text-[10px] font-mono uppercase tracking-wider shrink-0 ${
                         isCovered
                           ? 'text-luma-text-dim'
                           : isDueToday
@@ -345,25 +345,25 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
         </div>
 
         {/* Right Column: Runway & Recommendations (5 cols) */}
-        <div className="lg:col-span-5 space-y-6">
+        <div className="lg:col-span-5 space-y-4 xs:space-y-6">
           {/* Card 1: Dynamic Runway */}
-          <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6">
+          <div className="bg-luma-card border border-luma-card-border rounded-2xl xs:rounded-3xl p-4 xs:p-5 sm:p-6">
             <div className="text-[10px] font-mono tracking-widest uppercase text-luma-text-dim mb-2">
               {runwayTitle}
             </div>
 
-            <div className="text-4xl font-serif font-bold text-white mb-1">
+            <div className="text-3xl xs:text-4xl font-serif font-bold text-white mb-1">
               {daysRemaining} days
             </div>
 
-            <p className="text-xs text-luma-text-muted mb-6">
+            <p className="text-xs text-luma-text-muted mb-4 xs:mb-6">
               Tracking momentum across your {activeGoal.unit_label || 'milestones'}.
             </p>
 
             {/* Milestones */}
-            <div className="space-y-4 pt-2 border-t border-white/[0.06]">
+            <div className="space-y-3 xs:space-y-4 pt-2 border-t border-white/[0.06]">
               {(activeGoal.milestones || []).map((m, i) => (
-                <div key={i} className="flex items-center gap-3 text-xs">
+                <div key={i} className="flex items-center gap-2.5 xs:gap-3 text-xs">
                   {m.icon === 'trophy' ? (
                     <Trophy className="w-4 h-4 text-luma-lime shrink-0" />
                   ) : m.icon === 'repeat' ? (
@@ -371,16 +371,16 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
                   ) : (
                     <Flag className="w-4 h-4 text-[#f08a5d] shrink-0" />
                   )}
-                  <span className="font-mono text-white font-medium">{m.date}</span>
-                  <span className="text-luma-text-dim">·</span>
-                  <span className="text-luma-text-muted">{m.label}</span>
+                  <span className="font-mono text-white font-medium shrink-0">{m.date}</span>
+                  <span className="text-luma-text-dim shrink-0">·</span>
+                  <span className="text-luma-text-muted truncate">{m.label}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Card 2: Luma's Recommendation */}
-          <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6">
+          <div className="bg-luma-card border border-luma-card-border rounded-2xl xs:rounded-3xl p-4 xs:p-5 sm:p-6">
             <div className="text-[10px] font-mono tracking-widest uppercase text-luma-text-dim mb-3 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-luma-lime" />
               <span>Luma's Recommendation</span>
@@ -396,7 +396,7 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
             {onStartFocus && (
               <button
                 onClick={() => onStartFocus(`${activeGoal.title} · Deep Session`, 60)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-luma-purple/20 hover:bg-luma-purple text-luma-purple hover:text-white border border-luma-purple/30 text-xs font-semibold active:scale-95 transition-all shadow-sm"
+                className="w-full xs:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-luma-purple/20 hover:bg-luma-purple text-luma-purple hover:text-white border border-luma-purple/30 text-xs font-semibold active:scale-95 transition-all shadow-sm min-h-[44px]"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
                 <span>Launch deep focus session</span>

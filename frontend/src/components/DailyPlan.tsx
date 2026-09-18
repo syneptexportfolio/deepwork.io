@@ -16,8 +16,9 @@ import {
   Waves,
   Plus,
   Minus,
+  Coffee,
 } from 'lucide-react';
-import { api, Habit, WeeklyGoal, ScheduleBlock, isTimeWithinBlock, Goal, Task, getTimeBucket } from '../services/api';
+import { api, Habit, WeeklyGoal, ScheduleBlock, isTimeWithinBlock, Goal, Task, getTimeBucket, isBreakOrRestBlock } from '../services/api';
 import { getCategoryBadge } from './LearningPaths';
 import { AddTimelineTaskModal, insertAndReflowSchedule } from './modals/AddTimelineTaskModal';
 
@@ -153,11 +154,14 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
   // Sync today's schedule from prop into scheduleMap
   useEffect(() => {
     if (schedule && schedule.length > 0) {
-      setScheduleMap(prev => ({ ...prev, [todayDateStr]: schedule }));
+      setScheduleMap(prev => {
+        if (prev[todayDateStr]) return prev;
+        return { ...prev, [todayDateStr]: schedule };
+      });
     }
   }, [schedule, todayDateStr]);
 
-  // Load active dates from backend
+  // Load active dates from backend once on mount
   const loadActiveDates = async () => {
     try {
       const res = await api.getActiveScheduleDates();
@@ -169,7 +173,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
 
   useEffect(() => {
     loadActiveDates();
-  }, [schedule]);
+  }, []);
 
   // Fetch schedule whenever selectedDateStr changes
   useEffect(() => {
@@ -201,7 +205,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
     };
 
     fetchDaySchedule();
-  }, [selectedDateStr, todayDateStr, schedule]);
+  }, [selectedDateStr, todayDateStr]);
 
   // Track live current time (HH:MM) to highlight active block in real-time
   const [currentHHMM, setCurrentHHMM] = useState(() => {
@@ -229,18 +233,24 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
   const selectedDayItem = weekDays.find(w => w.dateStr === selectedDateStr) || weekDays.find(w => w.isToday) || weekDays[0];
   const selectedDayCode = selectedDayItem.day;
 
-  // Dynamic protected focus calculation for the active day
+  // Dynamic protected focus calculation for the active day (strictly deep focus work)
   const focusMinutes = activeDaySchedule
-    .filter(s => s.type === 'deep_focus')
+    .filter(s => s.type === 'deep_focus' && !isBreakOrRestBlock(s))
     .reduce((sum, s) => sum + s.duration, 0);
   const focusHrs = Math.floor(focusMinutes / 60);
   const focusMins = focusMinutes % 60;
   const totalProtectedText = focusMinutes > 0 ? `${focusHrs}H ${focusMins}M PROTECTED` : '0H 0M PROTECTED';
 
-  // Next pending block based on real time
-  const nextBlock = activeDaySchedule.length > 0 ? ((isSelectedToday
-    ? activeDaySchedule.find(s => s.status === 'pending' && s.type === 'deep_focus' && s.end_time >= currentHHMM)
-    : null) || activeDaySchedule.find(s => s.status === 'pending' && s.type === 'deep_focus') || activeDaySchedule[0]) : null;
+  // Next pending focus block based on real time (strictly excluding breaks, rest & lunch)
+  const pendingWorkBlocks = activeDaySchedule.filter(s => !isBreakOrRestBlock(s) && s.status === 'pending');
+  const nextBlock = activeDaySchedule.length > 0 ? (
+    (isSelectedToday
+      ? pendingWorkBlocks.find(s => s.type === 'deep_focus' && s.end_time >= currentHHMM) || pendingWorkBlocks.find(s => s.end_time >= currentHHMM)
+      : null) ||
+    pendingWorkBlocks.find(s => s.type === 'deep_focus') ||
+    pendingWorkBlocks[0] ||
+    null
+  ) : null;
 
   const sequenceTitle = isSelectedToday
     ? "Today's sequence"
@@ -250,6 +260,10 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
 
   // Toggle schedule status handler
   const handleToggleBlock = (blockId: string) => {
+    const targetBlock = (scheduleMap[selectedDateStr] || activeDaySchedule).find(b => b.id === blockId);
+    if (targetBlock && isBreakOrRestBlock(targetBlock)) {
+      return; // Breaks/rest/lunch cannot be marked as tasks
+    }
     // Optimistic update
     setScheduleMap(prev => {
       const list = prev[selectedDateStr] || activeDaySchedule;
@@ -347,30 +361,31 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
   return (
     <div className="space-y-8 animate-fadeIn">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
         <div>
-          <div className="text-[11px] font-mono tracking-widest uppercase text-luma-text-dim mb-1">
+          <div className="text-[10px] xs:text-[11px] font-mono tracking-widest uppercase text-luma-text-dim mb-1">
             Your Focused Week
           </div>
-          <h1 className="text-4xl md:text-5xl font-serif text-white tracking-tight mb-2">
+          <h1 className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl font-serif text-white tracking-tight mb-1.5 xs:mb-2">
             Daily plan
           </h1>
-          <p className="text-sm text-luma-text-muted">
+          <p className="text-xs sm:text-sm text-luma-text-muted">
             One clear commitment at a time.
           </p>
         </div>
 
         {/* Action Buttons: Only show Reshape button when day is already shaped; unshaped days use the empty state CTA */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {isPastDate ? (
-            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/[0.03] border border-white/10 text-luma-text-dim text-xs font-mono select-none">
+            <div className="flex items-center gap-2 px-3 py-1.5 xs:px-3.5 xs:py-2 rounded-2xl bg-white/[0.03] border border-white/10 text-luma-text-dim text-xs font-mono select-none">
               <History className="w-3.5 h-3.5" />
               <span>Past date • Archive</span>
             </div>
           ) : activeDaySchedule.length > 0 && onOpenShapeMyDay ? (
             <button
               onClick={() => onOpenShapeMyDay(selectedDateStr)}
-              className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-xs font-semibold border border-white/10 active:scale-95 transition-all shadow-sm"
+              className="flex items-center gap-1.5 xs:gap-2 px-3 xs:px-4 py-1.5 xs:py-2 rounded-2xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-xs font-semibold border border-white/10 active:scale-95 transition-all shadow-sm cursor-pointer"
               title="Reshape this day's timetable with AI"
             >
               <Sparkles className="w-3.5 h-3.5 text-luma-lime stroke-[2.2]" />
@@ -381,27 +396,27 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
       </div>
 
       {/* Weekday Selector Bar */}
-      <div className="bg-luma-card border border-luma-card-border rounded-3xl p-3 flex items-center justify-between">
+      <div className="bg-luma-card border border-luma-card-border rounded-3xl p-1 xs:p-1.5 sm:p-3 flex items-center justify-between gap-0.5 xs:gap-1 overflow-x-auto scrollbar-none">
         {weekDays.map((item) => {
           const isSelected = selectedDateStr === item.dateStr;
           return (
             <button
               key={item.day}
               onClick={() => setSelectedDateStr(item.dateStr)}
-              className={`flex-1 flex flex-col items-center py-3.5 px-2 rounded-2xl transition-all ${
+              className={`min-w-[36px] xs:min-w-[42px] sm:min-w-0 flex-1 flex flex-col items-center py-1.5 xs:py-2.5 sm:py-3.5 px-0.5 xs:px-1 sm:px-2 rounded-2xl transition-all cursor-pointer ${
                 isSelected
                   ? 'bg-luma-cream text-luma-cream-text shadow-sm'
                   : 'text-luma-text-muted hover:text-white hover:bg-white/[0.03]'
               }`}
             >
-              <span className="text-[10px] font-mono uppercase tracking-wider mb-1">
+              <span className="text-[9px] xs:text-[10px] font-mono uppercase tracking-wider mb-0.5 xs:mb-1">
                 {item.day}
               </span>
-              <div className="flex items-center gap-1 font-mono text-sm font-semibold">
+              <div className="flex items-center gap-0.5 xs:gap-1 font-mono text-xs sm:text-sm font-semibold">
                 <span>{item.date}</span>
                 {item.isToday && (
                   <span
-                    className={`w-2 h-2 rounded-full ${
+                    className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${
                       isSelected
                         ? 'bg-emerald-600 shadow-[0_0_8px_#10b981] ring-2 ring-emerald-500/40 animate-pulse'
                         : 'bg-luma-lime shadow-[0_0_8px_#d4f938] animate-pulse'
@@ -418,9 +433,9 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
       {/* Main Two-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Sequence (7 cols) */}
-        <div className="lg:col-span-7 bg-luma-card border border-luma-card-border rounded-3xl p-6">
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
-            <h2 className="text-base font-semibold text-white tracking-tight">
+        <div className="lg:col-span-7 bg-luma-card border border-luma-card-border rounded-2xl xs:rounded-3xl p-3.5 xs:p-5 sm:p-6">
+          <div className="flex items-center justify-between mb-4 xs:mb-6 flex-wrap gap-2">
+            <h2 className="text-sm xs:text-base font-semibold text-white tracking-tight">
               {sequenceTitle}
             </h2>
             <div className="flex items-center gap-2 flex-wrap">
@@ -480,8 +495,8 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
           ) : activeDaySchedule.length > 0 ? (
             <div className="relative pl-7 space-y-4 before:absolute before:left-[8px] before:top-4 before:bottom-4 before:w-[2px] before:bg-white/10">
               {activeDaySchedule.map((item) => {
-                const isDone = item.status === 'done';
-                const isBreak = item.type === 'break';
+                const isBreak = isBreakOrRestBlock(item);
+                const isDone = !isBreak && item.status === 'done';
                 const isSocial = item.category === 'Personal & Social' || item.category === 'Social';
                 const isCurrentlyActive = isSelectedToday && isTimeWithinBlock(currentHHMM, item.start_time, item.end_time);
 
@@ -500,7 +515,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                 const cardBg = isCurrentlyActive
                   ? 'bg-[#1b2618] border-l-4 border-l-luma-lime border-y-white/10 border-r-white/10 shadow-[0_0_20px_rgba(212,249,56,0.16)] text-white'
                   : isBreak
-                  ? 'bg-[#291a13] border-[#442b1f] text-[#f7ad72]'
+                  ? 'bg-[#241710]/85 border-[#3d2417] text-[#f7ad72]'
                   : isSocial
                   ? 'bg-[#251522] border-[#4a203f] text-[#f9a8d4]'
                   : isDone
@@ -518,78 +533,96 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                   : 'text-luma-purple';
 
                 return (
-                  <div key={item.id} className="relative flex items-center gap-4 group">
+                  <div key={item.id} className="relative flex items-center gap-1.5 xs:gap-2.5 sm:gap-4 group">
                     {/* Timeline Dot */}
                     <div
                       className={`absolute -left-[25px] w-3.5 h-3.5 rounded-full border-2 ${dotColor} transition-transform group-hover:scale-125 z-10`}
                     />
 
                     {/* Start Time */}
-                    <span className="w-12 text-xs font-mono text-luma-text-muted shrink-0">
+                    <span className="w-8 xs:w-10 sm:w-12 text-[10px] xs:text-[11px] sm:text-xs font-mono text-luma-text-muted shrink-0">
                       {item.start_time}
                     </span>
 
-                    {/* Task Card */}
+                    {/* Task or Recharge Card */}
                     <div
-                      onClick={() => handleToggleBlock(item.id)}
-                      className={`flex-1 flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer hover:brightness-110 ${cardBg}`}
+                      onClick={() => {
+                        if (!isBreak) {
+                          handleToggleBlock(item.id);
+                        }
+                      }}
+                      className={`flex-1 flex items-center justify-between p-2.5 xs:p-3 sm:p-4 rounded-2xl border transition-all gap-1.5 xs:gap-2 min-w-0 ${
+                        isBreak ? 'cursor-default select-none' : 'cursor-pointer hover:brightness-110'
+                      } ${cardBg}`}
                     >
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {isDone ? (
+                      <div className="flex items-center gap-1.5 xs:gap-2 flex-wrap min-w-0 flex-1">
+                        {isBreak ? (
+                          <div className="w-5 h-5 rounded-lg flex items-center justify-center shrink-0 bg-[#3d2417] text-[#f7ad72]" title="Recharge Window">
+                            <Coffee className="w-3.5 h-3.5 stroke-[2]" />
+                          </div>
+                        ) : isDone ? (
                           <CheckCircle2 className="w-4 h-4 text-luma-lime shrink-0" />
                         ) : (
                           <Circle className="w-4 h-4 text-luma-text-dim group-hover:text-white shrink-0" />
                         )}
                         <span
-                          className={`text-sm font-medium ${
-                            isDone ? 'line-through text-white/60' : ''
+                          className={`text-xs xs:text-sm font-medium truncate ${
+                            isBreak ? 'text-[#f7ad72]/95' : isDone ? 'line-through text-white/60' : ''
                           }`}
                         >
                           {item.title}
                         </span>
-                        {isCurrentlyActive && (
-                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-luma-lime text-black font-bold tracking-wider flex items-center gap-1 shadow-sm animate-pulse">
+                        {isBreak ? (
+                          <span className="text-[8.5px] xs:text-[9px] font-mono px-1.5 xs:px-2 py-0.5 rounded-full bg-[#3d2417] text-[#f7ad72] border border-[#5a3623] font-semibold tracking-wider shrink-0">
+                            RECHARGE
+                          </span>
+                        ) : isCurrentlyActive ? (
+                          <span className="text-[8.5px] xs:text-[9px] font-mono px-1.5 xs:px-2 py-0.5 rounded-full bg-luma-lime text-black font-bold tracking-wider flex items-center gap-1 shadow-sm animate-pulse shrink-0">
                             <span className="w-1.5 h-1.5 rounded-full bg-black"></span>
-                            ACTIVE NOW
+                            ACTIVE
                           </span>
-                        )}
-                        {isSocial ? (
-                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-300 border border-pink-500/30">
-                            🎉 SOCIAL / EVENING
+                        ) : null}
+                        {!isBreak && isSocial ? (
+                          <span className="text-[8.5px] xs:text-[9px] font-mono px-1.5 xs:px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-300 border border-pink-500/30 shrink-0">
+                            🎉 SOCIAL
                           </span>
-                        ) : item.block_source === 'habit' ? (
-                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-luma-purple-dim text-luma-purple border border-luma-purple/30">
+                        ) : !isBreak && item.block_source === 'habit' ? (
+                          <span className="text-[8.5px] xs:text-[9px] font-mono px-1.5 xs:px-2 py-0.5 rounded-full bg-luma-purple-dim text-luma-purple border border-luma-purple/30 shrink-0">
                             HABIT
                           </span>
-                        ) : item.block_source === 'weekly_goal' ? (
-                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#242b10] text-luma-lime border border-luma-lime/30">
-                            WEEKLY GOAL
+                        ) : !isBreak && item.block_source === 'weekly_goal' ? (
+                          <span className="text-[8.5px] xs:text-[9px] font-mono px-1.5 xs:px-2 py-0.5 rounded-full bg-[#242b10] text-luma-lime border border-luma-lime/30 shrink-0">
+                            WEEKLY
                           </span>
-                        ) : item.block_source === 'long_term_goal' ? (
-                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#1b2535] text-[#60a5fa] border border-[#60a5fa]/30">
-                            LONG-TERM GOAL
+                        ) : !isBreak && item.block_source === 'long_term_goal' ? (
+                          <span className="text-[8.5px] xs:text-[9px] font-mono px-1.5 xs:px-2 py-0.5 rounded-full bg-[#1b2535] text-[#60a5fa] border border-[#60a5fa]/30 shrink-0">
+                            GOAL
                           </span>
-                        ) : item.block_source === 'daily_todo' ? (
-                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-luma-text-muted border border-white/10">
+                        ) : !isBreak && item.block_source === 'daily_todo' ? (
+                          <span className="text-[8.5px] xs:text-[9px] font-mono px-1.5 xs:px-2 py-0.5 rounded-full bg-white/5 text-luma-text-muted border border-white/10 shrink-0">
                             TO-DO
                           </span>
                         ) : null}
                       </div>
 
-                      {item.target_label ? (
-                        <span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 ${isCurrentlyActive ? 'text-luma-lime border-luma-lime/40' : 'text-luma-lime'}`}>
+                      {isBreak ? (
+                        <span className="text-[10px] xs:text-[11px] font-mono font-semibold uppercase tracking-wider text-[#e6934c] bg-[#3d2417] px-2 py-0.5 rounded-lg border border-[#523120] shrink-0">
+                          {item.duration}M REST
+                        </span>
+                      ) : item.target_label ? (
+                        <span className={`text-[11px] xs:text-xs font-mono font-semibold px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 shrink-0 ${isCurrentlyActive ? 'text-luma-lime border-luma-lime/40' : 'text-luma-lime'}`}>
                           {item.target_label}
                         </span>
                       ) : item.is_untimed || item.duration === 0 ? (
-                        <span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 flex items-center gap-1 ${isCurrentlyActive ? 'text-luma-lime border-luma-lime/40' : 'text-luma-text-dim'}`}>
+                        <span className={`text-[11px] xs:text-xs font-mono font-semibold px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 flex items-center gap-1 shrink-0 ${isCurrentlyActive ? 'text-luma-lime border-luma-lime/40' : 'text-luma-text-dim'}`}>
                           <span className={isCurrentlyActive ? 'text-luma-lime' : ''}>⚡</span>
-                          <span className={isCurrentlyActive ? 'text-luma-lime font-bold' : ''}>Action item</span>
+                          <span className={isCurrentlyActive ? 'text-luma-lime font-bold' : ''}>Action</span>
                         </span>
                       ) : (
                         <span
-                          className={`text-xs font-mono font-semibold uppercase tracking-wider ${durationColor}`}
+                          className={`text-[11px] xs:text-xs font-mono font-semibold uppercase tracking-wider shrink-0 ${durationColor}`}
                         >
-                          {item.duration} MIN
+                          {item.duration}M
                         </span>
                       )}
                     </div>
@@ -636,9 +669,9 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
         </div>
 
         {/* Right Column: Hero Spotlight + Unified Horizon Radar Hub (5 cols) */}
-        <div className="lg:col-span-5 space-y-6">
+        <div className="lg:col-span-5 space-y-4 xs:space-y-6">
           {/* 1. Next Protected Block Hero Spotlight (Elevated to top) */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-[#f5f1e8] to-[#e8e2d5] text-luma-cream-text rounded-3xl p-6 sm:p-7 shadow-md">
+          <div className="relative overflow-hidden bg-gradient-to-br from-[#f5f1e8] to-[#e8e2d5] text-luma-cream-text rounded-2xl xs:rounded-3xl p-4 xs:p-6 sm:p-7 shadow-md">
             {/* Soft decorative background purple blob */}
             <div className="absolute -bottom-10 -right-10 w-44 h-44 rounded-full bg-[#9f8ff5]/35 blur-2xl pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-28 h-28 rounded-tl-full bg-[#9f8ff5]/25 pointer-events-none" />
@@ -650,11 +683,11 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                     NO COMMITMENTS SCHEDULED
                   </div>
 
-                  <h3 className="text-2xl font-serif font-bold text-[#141514] tracking-tight mb-1">
+                  <h3 className="text-xl xs:text-2xl font-serif font-bold text-[#141514] tracking-tight mb-1">
                     Your canvas is clear.
                   </h3>
 
-                  <p className="text-xs text-[#52574e] mb-5 leading-relaxed">
+                  <p className="text-xs text-[#52574e] mb-4 xs:mb-5 leading-relaxed">
                     {isSelectedToday
                       ? 'Add tasks, daily habits, or weekly goals to generate an energy-aligned timetable.'
                       : `No focus blocks scheduled for ${fullDayNames[selectedDayCode]}. Shape this day in advance with AI.`}
@@ -664,7 +697,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                     <button
                       type="button"
                       onClick={() => onOpenShapeMyDay(selectedDateStr)}
-                      className="inline-flex items-center gap-2 bg-[#121312] text-white px-5 py-2.5 rounded-2xl text-xs font-semibold shadow-md hover:bg-black transition-all cursor-pointer active:scale-95"
+                      className="w-full xs:w-auto inline-flex items-center justify-center gap-2 bg-[#121312] text-white px-4 xs:px-5 py-2.5 rounded-2xl text-xs font-semibold shadow-md hover:bg-black transition-all cursor-pointer active:scale-95 min-h-[44px]"
                     >
                       <Sparkles className="w-4 h-4 text-luma-lime stroke-[2.2]" />
                       <span>Shape timetable with AI</span>
@@ -673,22 +706,22 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                 </>
               ) : nextBlock ? (
                 <>
-                  <div className="text-[10px] font-mono tracking-widest uppercase text-[#5a604f] mb-3 font-semibold">
+                  <div className="text-[10px] font-mono tracking-widest uppercase text-[#5a604f] mb-2 xs:mb-3 font-semibold">
                     NEXT PROTECTED BLOCK · {nextBlock.start_time}
                   </div>
 
-                  <h3 className="text-2xl font-serif font-bold text-[#141514] tracking-tight mb-1">
+                  <h3 className="text-xl xs:text-2xl font-serif font-bold text-[#141514] tracking-tight mb-1">
                     {nextBlock.title.split('·')[0].trim()}, uninterrupted.
                   </h3>
 
-                  <p className="text-xs text-[#52574e] mb-5 leading-relaxed">
+                  <p className="text-xs text-[#52574e] mb-4 xs:mb-5 leading-relaxed">
                     {nextBlock.duration} minutes reserved for {nextBlock.category || 'deep focus'}.
                   </p>
 
                   <button
                     type="button"
                     onClick={() => onStartFocus(nextBlock.title, nextBlock.duration, nextBlock.id)}
-                    className="flex items-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-5 py-2.5 rounded-2xl font-semibold text-xs shadow-md active:scale-95 transition-all cursor-pointer"
+                    className="w-full xs:w-auto flex items-center justify-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-4 xs:px-5 py-2.5 rounded-2xl font-semibold text-xs shadow-md active:scale-95 transition-all cursor-pointer min-h-[44px]"
                   >
                     <Play className="w-3.5 h-3.5 fill-black" />
                     <span>Begin focus session</span>
@@ -696,26 +729,26 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                 </>
               ) : (
                 <>
-                  <div className="text-[10px] font-mono tracking-widest uppercase text-[#5a604f] mb-3 font-semibold">
+                  <div className="text-[10px] font-mono tracking-widest uppercase text-[#5a604f] mb-2 xs:mb-3 font-semibold">
                     RHYTHM ACHIEVED · ALL BLOCKS COMPLETED
                   </div>
 
-                  <h3 className="text-2xl font-serif font-bold text-[#141514] tracking-tight mb-1">
+                  <h3 className="text-xl xs:text-2xl font-serif font-bold text-[#141514] tracking-tight mb-1">
                     Outstanding consistency.
                   </h3>
 
-                  <p className="text-xs text-[#52574e] mb-5 leading-relaxed">
+                  <p className="text-xs text-[#52574e] mb-4 xs:mb-5 leading-relaxed">
                     All scheduled focus commitments for today have been fulfilled. Time to step away & recharge.
                   </p>
 
-                  <div className="inline-flex items-center gap-2 bg-[#252824] text-luma-lime px-4 py-2 rounded-2xl text-xs font-mono font-semibold">
+                  <div className="inline-flex items-center gap-2 bg-[#252824] text-luma-lime px-3.5 xs:px-4 py-2 rounded-2xl text-xs font-mono font-semibold">
                     <span>✓ 100% Kept Today</span>
                   </div>
                 </>
               )}
 
               {/* Integrated Circadian Energy Alignment Footnote */}
-              <div className="pt-3.5 mt-4 border-t border-black/10 flex items-start gap-2 text-[11px] text-[#4d5249] leading-relaxed">
+              <div className="pt-3 mt-3.5 xs:pt-3.5 xs:mt-4 border-t border-black/10 flex items-start gap-2 text-[10px] xs:text-[11px] text-[#4d5249] leading-relaxed">
                 <span className="text-[#2d3a24] font-bold shrink-0">⚡ Energy-aligned:</span>
                 <span>
                   {activeDaySchedule.length > 0
@@ -727,14 +760,14 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
           </div>
 
           {/* 2. Unified Horizon Radar Hub (Habits, Weekly Goals, Long View) */}
-          <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 shadow-sm">
+          <div className="bg-luma-card border border-luma-card-border rounded-2xl xs:rounded-3xl p-3.5 xs:p-5 sm:p-6 shadow-sm">
             {/* Segmented Pill Navigation */}
             <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-white/[0.06] gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#141514] border border-white/5 w-full sm:w-auto">
+              <div className="flex items-center gap-1 xs:gap-1.5 p-1 rounded-2xl bg-[#141514] border border-white/5 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setActiveHorizonTab('anchors')}
-                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1 xs:gap-1.5 px-2 xs:px-3 py-1.5 rounded-xl text-[11px] xs:text-xs font-medium transition-all cursor-pointer min-h-[40px] ${
                     activeHorizonTab === 'anchors'
                       ? 'bg-luma-purple text-white shadow-sm font-semibold'
                       : 'text-luma-text-muted hover:text-white hover:bg-white/5'
@@ -743,7 +776,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                   <Zap className="w-3.5 h-3.5" />
                   <span>Habits</span>
                   {activeHabits.length > 0 && (
-                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                    <span className={`text-[9px] xs:text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
                       activeHorizonTab === 'anchors' ? 'bg-white/20 text-white font-bold' : 'bg-white/5 text-luma-text-dim'
                     }`}>
                       {completedHabitsCount}/{activeHabits.length}
@@ -754,16 +787,17 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveHorizonTab('weekly')}
-                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1 xs:gap-1.5 px-2 xs:px-3 py-1.5 rounded-xl text-[11px] xs:text-xs font-medium transition-all cursor-pointer min-h-[40px] ${
                     activeHorizonTab === 'weekly'
                       ? 'bg-luma-lime text-black shadow-sm font-semibold'
                       : 'text-luma-text-muted hover:text-white hover:bg-white/5'
                   }`}
                 >
                   <Target className="w-3.5 h-3.5" />
-                  <span>Weekly Sprint</span>
+                  <span className="xs:hidden">Weekly</span>
+                  <span className="hidden xs:inline">Weekly Sprint</span>
                   {weeklyGoals.length > 0 && (
-                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                    <span className={`text-[9px] xs:text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
                       activeHorizonTab === 'weekly' ? 'bg-black/20 text-black font-bold' : 'bg-white/5 text-luma-text-dim'
                     }`}>
                       {weeklyGoals.length}
@@ -774,16 +808,17 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveHorizonTab('long')}
-                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1 xs:gap-1.5 px-2 xs:px-3 py-1.5 rounded-xl text-[11px] xs:text-xs font-medium transition-all cursor-pointer min-h-[40px] ${
                     activeHorizonTab === 'long'
                       ? 'bg-[#3b82f6] text-white shadow-sm font-semibold'
                       : 'text-luma-text-muted hover:text-white hover:bg-white/5'
                   }`}
                 >
                   <Compass className="w-3.5 h-3.5" />
-                  <span>Long View</span>
+                  <span className="xs:hidden">Goals</span>
+                  <span className="hidden xs:inline">Long View</span>
                   {goals.length > 0 && (
-                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                    <span className={`text-[9px] xs:text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
                       activeHorizonTab === 'long' ? 'bg-white/20 text-white font-bold' : 'bg-white/5 text-luma-text-dim'
                     }`}>
                       {goals.length}

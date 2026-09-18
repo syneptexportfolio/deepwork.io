@@ -109,15 +109,15 @@ export const WeeklyGoalVisualizer: React.FC<WeeklyGoalVisualizerProps> = ({
   }, [weeklyGoals]);
 
   return (
-    <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 relative overflow-hidden transition-all shadow-md">
+    <div className="bg-luma-card border border-luma-card-border rounded-2xl xs:rounded-3xl p-3.5 xs:p-5 sm:p-6 relative overflow-hidden transition-all shadow-md">
       {/* Ambient background glow */}
       <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-luma-lime/5 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-[#4287f5]/5 blur-3xl pointer-events-none" />
 
       {/* Top row: Metrics & Pacing Badge */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4 mb-4 sm:mb-6">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <span className="text-xs font-mono tracking-widest uppercase text-luma-lime font-bold">
               Weekly Horizon
             </span>
@@ -134,7 +134,7 @@ export const WeeklyGoalVisualizer: React.FC<WeeklyGoalVisualizerProps> = ({
         </div>
 
         {/* Aggregate Unit Counter */}
-        <div className="flex items-center gap-4 bg-[#141614] border border-white/[0.05] rounded-2xl px-4 py-3 shrink-0">
+        <div className="flex items-center justify-between sm:justify-start gap-4 bg-[#141614] border border-white/[0.05] rounded-2xl px-3.5 xs:px-4 py-2.5 xs:py-3 shrink-0 w-full sm:w-auto">
           <div>
             <div className="text-[10px] font-mono uppercase text-luma-text-dim">
               Weekly Cumulative
@@ -157,7 +157,7 @@ export const WeeklyGoalVisualizer: React.FC<WeeklyGoalVisualizerProps> = ({
 
       {/* Trajectory Dual Bar: Actual vs. Calendar Elapsed */}
       <div className="space-y-2 mb-6">
-        <div className="flex items-center justify-between text-xs font-mono">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs font-mono">
           <span className="text-white flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-luma-lime shadow-[0_0_8px_#d4f938]" />
             <span>Actual Completed: {aggregateProgress}%</span>
@@ -207,11 +207,11 @@ export const WeeklyGoalVisualizer: React.FC<WeeklyGoalVisualizerProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1 xs:gap-1.5 flex-wrap">
           <button
             type="button"
             onClick={() => onSelectCategoryFilter('all')}
-            className={`px-3 py-1 rounded-xl text-xs font-mono transition-all ${
+            className={`px-2 xs:px-3 py-1 rounded-lg xs:rounded-xl text-[10px] xs:text-xs font-mono transition-all ${
               activeCategoryFilter === 'all'
                 ? 'bg-luma-lime text-black font-semibold shadow-lime-glow'
                 : 'bg-white/[0.04] text-luma-text-muted hover:text-white hover:bg-white/[0.08]'
@@ -225,7 +225,7 @@ export const WeeklyGoalVisualizer: React.FC<WeeklyGoalVisualizerProps> = ({
               key={c.name}
               type="button"
               onClick={() => onSelectCategoryFilter(c.name)}
-              className={`px-3 py-1 rounded-xl text-xs font-mono transition-all ${
+              className={`px-2 xs:px-3 py-1 rounded-lg xs:rounded-xl text-[10px] xs:text-xs font-mono transition-all ${
                 activeCategoryFilter === c.name
                   ? 'bg-white text-black font-semibold shadow-sm'
                   : 'bg-white/[0.04] text-luma-text-muted hover:text-white hover:bg-white/[0.08]'

@@ -12,18 +12,36 @@ import { WeeklyGoalModal } from './components/modals/WeeklyGoalModal';
 import { FocusSessionModal } from './components/modals/FocusSessionModal';
 import { SettingsModal } from './components/modals/SettingsModal';
 import { PasscodeGate } from './components/PasscodeGate';
-import { api, Goal, Habit, QuestionnaireAnswers, ScheduleBlock, StatsResponse, Task, WeeklyGoal } from './services/api';
+import { api, Goal, Habit, QuestionnaireAnswers, ScheduleBlock, StatsResponse, Task, WeeklyGoal, isBreakOrRestBlock } from './services/api';
 import confetti from 'canvas-confetti';
+
+const getCachedJson = <T,>(key: string, fallback: T): T => {
+  try {
+    const raw = localStorage.getItem(`luma_cache_${key}`);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const setCachedJson = (key: string, data: any) => {
+  try {
+    localStorage.setItem(`luma_cache_${key}`, JSON.stringify(data));
+  } catch {}
+};
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>('overview');
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [habits, setHabits] = useState<Habit[]>([]);
-  const [weeklyGoals, setWeeklyGoals] = useState<WeeklyGoal[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [selectedGoalId, setSelectedGoalId] = useState<string>('');
-  const [schedule, setSchedule] = useState<ScheduleBlock[]>([]);
-  const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [tasks, setTasks] = useState<Task[]>(() => getCachedJson<Task[]>('tasks', []));
+  const [habits, setHabits] = useState<Habit[]>(() => getCachedJson<Habit[]>('habits', []));
+  const [weeklyGoals, setWeeklyGoals] = useState<WeeklyGoal[]>(() => getCachedJson<WeeklyGoal[]>('weeklyGoals', []));
+  const [goals, setGoals] = useState<Goal[]>(() => getCachedJson<Goal[]>('goals', []));
+  const [selectedGoalId, setSelectedGoalId] = useState<string>(() => {
+    const cached = getCachedJson<Goal[]>('goals', []);
+    return cached[0]?.id || '';
+  });
+  const [schedule, setSchedule] = useState<ScheduleBlock[]>(() => getCachedJson<ScheduleBlock[]>('schedule', []));
+  const [stats, setStats] = useState<StatsResponse | null>(() => getCachedJson<StatsResponse | null>('stats', null));
 
   // Modals & Flows
   const [isShapeMyDayOpen, setIsShapeMyDayOpen] = useState(false);
@@ -62,22 +80,20 @@ export const App: React.FC = () => {
 
   const getTodayISTStr = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
-  // Load all data
+  // Fast parallel load with cache write
   const loadData = async () => {
     try {
       const todayDateStr = getTodayISTStr();
-      const health = await api.checkHealth();
-      if (health.hasPasscode) {
-        try {
-          await api.getTasks(todayDateStr);
-        } catch {
-          setIsLocked(true);
-          return;
-        }
-      }
 
-      const [tasksRes, habitsRes, weeklyRes, goalsRes, schedRes, statsRes] = await Promise.all([
-        api.getTasks(todayDateStr).catch(() => ({ success: true, tasks: [] })),
+      // Launch all initial requests in parallel
+      const [healthRes, tasksRes, habitsRes, weeklyRes, goalsRes, schedRes, statsRes] = await Promise.all([
+        api.checkHealth().catch(() => ({ status: 'error', hasPasscode: false })),
+        api.getTasks(todayDateStr).catch((err: any) => {
+          if (err?.message?.includes('401') || err?.message?.includes('Passcode')) {
+            setIsLocked(true);
+          }
+          return { success: true, tasks: [] };
+        }),
         api.getHabits().catch(() => ({ success: true, habits: [] })),
         api.getWeeklyGoals().catch(() => ({ success: true, weeklyGoals: [] })),
         api.getGoals().catch(() => ({ success: true, goals: [] })),
@@ -85,12 +101,38 @@ export const App: React.FC = () => {
         api.getStats().catch(() => ({ success: true, stats: null })),
       ]);
 
-      if (tasksRes.tasks) setTasks(tasksRes.tasks);
-      if (habitsRes.habits) setHabits(habitsRes.habits);
-      if (weeklyRes.weeklyGoals) setWeeklyGoals(weeklyRes.weeklyGoals);
-      if (goalsRes.goals) setGoals(goalsRes.goals);
-      if (schedRes.schedule) setSchedule(schedRes.schedule);
-      if (statsRes.stats) setStats(statsRes.stats);
+      if (healthRes.hasPasscode && tasksRes.tasks === undefined) {
+        setIsLocked(true);
+        return;
+      }
+
+      if (tasksRes.tasks) {
+        setTasks(tasksRes.tasks);
+        setCachedJson('tasks', tasksRes.tasks);
+      }
+      if (habitsRes.habits) {
+        setHabits(habitsRes.habits);
+        setCachedJson('habits', habitsRes.habits);
+      }
+      if (weeklyRes.weeklyGoals) {
+        setWeeklyGoals(weeklyRes.weeklyGoals);
+        setCachedJson('weeklyGoals', weeklyRes.weeklyGoals);
+      }
+      if (goalsRes.goals) {
+        setGoals(goalsRes.goals);
+        setCachedJson('goals', goalsRes.goals);
+        if (!selectedGoalId && goalsRes.goals.length > 0) {
+          setSelectedGoalId(goalsRes.goals[0].id);
+        }
+      }
+      if (schedRes.schedule) {
+        setSchedule(schedRes.schedule);
+        setCachedJson('schedule', schedRes.schedule);
+      }
+      if (statsRes.stats) {
+        setStats(statsRes.stats);
+        setCachedJson('stats', statsRes.stats);
+      }
     } catch (err) {
       console.error('Failed to load Luma data:', err);
     }
@@ -104,6 +146,9 @@ export const App: React.FC = () => {
 
   const handleToggleScheduleStatus = async (scheduleId: string, dateStr?: string) => {
     const block = schedule.find(s => s.id === scheduleId);
+    if (block && isBreakOrRestBlock(block)) {
+      return; // Never toggle or count breaks as tasks
+    }
     const newStatus = block ? (block.status === 'done' ? 'pending' : 'done') : 'done';
 
     if (newStatus === 'done') {
@@ -117,27 +162,55 @@ export const App: React.FC = () => {
 
     try {
       await api.updateScheduleBlock(scheduleId, newStatus, dateStr);
-      const statsRes = await api.getStats();
-      if (statsRes.stats) setStats(statsRes.stats);
+      api.getStats().then(statsRes => {
+        if (statsRes?.stats) {
+          setStats(statsRes.stats);
+          setCachedJson('stats', statsRes.stats);
+        }
+      }).catch(() => {});
     } catch (err) {
       console.error('Failed to toggle schedule block in backend:', err);
     }
   };
 
   const handleCheckHabitStreak = async (habitId: string) => {
+    const todayIST = getTodayISTStr();
+    const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
+
+    const isCurrentlyDone = habit.last_completed_date === todayIST;
+    const nextIsDone = !isCurrentlyDone;
+
+    if (nextIsDone) {
+      confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+    }
+
+    // 1. Instant 0ms Optimistic UI feedback
+    const optimisticHabit: Habit = {
+      ...habit,
+      last_completed_date: nextIsDone ? todayIST : undefined,
+      streak_count: nextIsDone ? (habit.streak_count || 0) + 1 : Math.max(0, (habit.streak_count || 1) - 1),
+    };
+
+    setHabits(prev => prev.map(h => h.id === habitId ? optimisticHabit : h));
+
+    // 2. Background server sync
     try {
-      const habit = habits.find(h => h.id === habitId);
-      const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
-      const isDone = habit?.last_completed_date === todayIST;
-      if (!isDone) {
-        confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
-      }
       const res = await api.checkHabitStreak(habitId);
       if (res.habit) {
         setHabits(prev => prev.map(h => h.id === habitId ? res.habit : h));
       }
+      api.getStats().then(s => {
+        if (s?.stats) {
+          setStats(s.stats);
+          setCachedJson('stats', s.stats);
+        }
+      }).catch(() => {});
     } catch (err) {
       console.error('Failed to update habit streak:', err);
+      // Revert on error
+      setHabits(prev => prev.map(h => h.id === habitId ? habit : h));
+      showToast('Failed to update habit streak', 'error');
     }
   };
 
@@ -154,11 +227,13 @@ export const App: React.FC = () => {
           setHabits(prev => [...prev, res.habit]);
         }
       }
+      // Instant modal close!
       setIsHabitModalOpen(false);
       setEditingHabit(null);
-      await loadData();
+      api.getStats().then(s => { if (s?.stats) setStats(s.stats); }).catch(() => {});
     } catch (err: any) {
       console.error('Failed to save habit:', err);
+      showToast(err.message || 'Failed to save habit', 'error');
     }
   };
 
@@ -175,11 +250,13 @@ export const App: React.FC = () => {
           setWeeklyGoals(prev => [...prev, res.weeklyGoal]);
         }
       }
+      // Instant modal close!
       setIsWeeklyGoalModalOpen(false);
       setEditingWeeklyGoal(null);
-      await loadData();
+      api.getStats().then(s => { if (s?.stats) setStats(s.stats); }).catch(() => {});
     } catch (err: any) {
       console.error('Failed to save weekly goal:', err);
+      showToast(err.message || 'Failed to save weekly goal', 'error');
     }
   };
 
@@ -187,7 +264,7 @@ export const App: React.FC = () => {
     try {
       await api.deleteHabit(id);
       setHabits(prev => prev.filter(h => h.id !== id));
-      await loadData();
+      api.getStats().then(s => { if (s?.stats) setStats(s.stats); }).catch(() => {});
     } catch (err: any) {
       showToast(err.message || 'Failed to delete habit', 'error');
     }
@@ -197,9 +274,10 @@ export const App: React.FC = () => {
     try {
       await api.deleteWeeklyGoal(id);
       setWeeklyGoals(prev => prev.filter(wg => wg.id !== id));
-      await loadData();
+      api.getStats().then(s => { if (s?.stats) setStats(s.stats); }).catch(() => {});
     } catch (err: any) {
       console.error('Failed to delete weekly goal:', err);
+      showToast(err.message || 'Failed to delete weekly goal', 'error');
     }
   };
 
@@ -277,9 +355,9 @@ export const App: React.FC = () => {
         task_date: getTodayISTStr(),
       });
       if (res.task) {
-        setTasks(prev => [...prev, res.task]);
+        setTasks(prev => [res.task, ...prev]);
       }
-      await loadData();
+      api.getStats().then(s => { if (s?.stats) setStats(s.stats); }).catch(() => {});
     } catch (err: any) {
       showToast(err.message || 'Failed to add quick to-do', 'error');
     }
@@ -355,10 +433,13 @@ export const App: React.FC = () => {
           task_date: taskData.task_date || getTodayISTStr(),
         });
         if (res.task) {
-          setTasks(prev => [...prev, res.task]);
+          setTasks(prev => [res.task, ...prev]);
         }
       }
-      await loadData();
+      // Instant modal close!
+      setIsTaskModalOpen(false);
+      setEditingTask(null);
+      api.getStats().then(s => { if (s?.stats) setStats(s.stats); }).catch(() => {});
     } catch (err: any) {
       showToast(err.message || 'Failed to save task', 'error');
     }
@@ -368,7 +449,7 @@ export const App: React.FC = () => {
     try {
       await api.deleteTask(id);
       setTasks(prev => prev.filter(t => t.id !== id));
-      await loadData();
+      api.getStats().then(s => { if (s?.stats) setStats(s.stats); }).catch(() => {});
     } catch (err: any) {
       showToast(err.message || 'Failed to delete task', 'error');
     }
@@ -379,8 +460,13 @@ export const App: React.FC = () => {
       const res = await api.createGoal(goalData);
       if (res.goal) {
         setGoals(prev => [...prev, res.goal]);
+        if (!selectedGoalId) {
+          setSelectedGoalId(res.goal.id);
+        }
       }
-      await loadData();
+      // Instant modal close!
+      setIsGoalModalOpen(false);
+      api.getStats().then(s => { if (s?.stats) setStats(s.stats); }).catch(() => {});
     } catch (err: any) {
       showToast(err.message || 'Failed to create learning path', 'error');
     }
@@ -396,7 +482,7 @@ export const App: React.FC = () => {
         }
         return remaining;
       });
-      await loadData();
+      api.getStats().then(s => { if (s?.stats) setStats(s.stats); }).catch(() => {});
     } catch (err: any) {
       showToast(err.message || 'Failed to delete learning path', 'error');
     }

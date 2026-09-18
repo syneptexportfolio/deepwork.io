@@ -206,10 +206,10 @@ export const WeeklyGoalModal: React.FC<WeeklyGoalModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-lg max-h-[90vh] bg-luma-card border border-luma-card-border rounded-3xl shadow-2xl relative flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+      <div className="w-full sm:max-w-lg max-h-[94vh] sm:max-h-[90vh] bg-luma-card border border-luma-card-border rounded-t-3xl sm:rounded-3xl shadow-2xl relative flex flex-col overflow-hidden">
         {/* FIXED HEADER (Never pushed off screen) */}
-        <div className="px-6 py-4 sm:py-5 border-b border-white/[0.06] flex items-start justify-between shrink-0 bg-[#161716]">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-white/[0.06] flex items-start justify-between shrink-0 bg-[#161716]">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className="w-7 h-7 rounded-xl bg-[#2a3015] flex items-center justify-center text-luma-lime shrink-0">
@@ -234,7 +234,7 @@ export const WeeklyGoalModal: React.FC<WeeklyGoalModalProps> = ({
 
         {/* SCROLLABLE FORM BODY & STICKY FOOTER */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <div className="px-6 py-4 overflow-y-auto space-y-4 flex-1">
+          <div className="px-4 sm:px-6 py-4 overflow-y-auto space-y-4 flex-1">
             {/* QUICK PRESETS (Multi-Domain Templates) */}
             {!goal && (
               <div className="pb-3 border-b border-white/[0.06]">
@@ -322,7 +322,7 @@ export const WeeklyGoalModal: React.FC<WeeklyGoalModalProps> = ({
             </div>
 
             {/* TARGET UNITS & UNIT LABEL DROPDOWN */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-mono uppercase tracking-wider text-luma-text-dim block mb-1.5">
                   Target Units
@@ -402,7 +402,7 @@ export const WeeklyGoalModal: React.FC<WeeklyGoalModalProps> = ({
             )}
 
             {/* PRIORITY & COGNITIVE ENERGY */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-mono uppercase tracking-wider text-luma-text-dim block mb-1.5">
                   Priority
@@ -434,7 +434,7 @@ export const WeeklyGoalModal: React.FC<WeeklyGoalModalProps> = ({
           </div>
 
           {/* PERMANENT STICKY BOTTOM FOOTER (Always visible, never cut off!) */}
-          <div className="px-6 py-3.5 border-t border-white/[0.06] bg-[#141514] flex items-center justify-between shrink-0">
+          <div className="px-4 sm:px-6 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] border-t border-white/[0.06] bg-[#141514] flex flex-wrap items-center justify-between gap-3 shrink-0">
             {goal && onDelete ? (
               isConfirmingDelete ? (
                 <div className="flex items-center gap-2 bg-[#2a1717] border border-red-500/30 px-3 py-1.5 rounded-2xl animate-fadeIn">

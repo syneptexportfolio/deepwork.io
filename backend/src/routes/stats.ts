@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { Env, Task } from '../types';
+import { Env, Task, isBreakOrRestBlock } from '../types';
 import { getTodayIST } from './schedule';
 
 export const statsRouter = new Hono<{ Bindings: Env }>();
@@ -28,7 +28,7 @@ statsRouter.get('/', async (c) => {
     if (todaySched && todaySched.generated_plan) {
       try {
         const blocks: any[] = JSON.parse(todaySched.generated_plan);
-        const activeBlocks = blocks.filter(b => b.type !== 'break');
+        const activeBlocks = blocks.filter(b => !isBreakOrRestBlock(b));
         const doneBlocks = activeBlocks.filter(b => b.status === 'done');
         const nextPending = activeBlocks.find(b => b.status === 'pending');
 
@@ -105,7 +105,7 @@ statsRouter.get('/', async (c) => {
     let totalAfternoonDone = 0;
     for (const [, blocks] of scheduleByDate) {
       for (const b of blocks) {
-        if (b.status === 'done' && b.type !== 'break') {
+        if (b.status === 'done' && !isBreakOrRestBlock(b)) {
           const startH = parseInt((b.start_time || '12:00').split(':')[0], 10);
           if (startH < 12) totalMorningDone++;
           else totalAfternoonDone++;
@@ -123,7 +123,7 @@ statsRouter.get('/', async (c) => {
         d.setDate(monday.getDate() + idx);
         const dateStr = d.toISOString().split('T')[0];
         const dayBlocks = (scheduleByDate.get(dateStr) || []).filter(b => {
-          if (b.type === 'break') return false;
+          if (isBreakOrRestBlock(b)) return false;
           const h = parseInt((b.start_time || '12:00').split(':')[0], 10);
           return filterFn(h);
         });
@@ -145,7 +145,7 @@ statsRouter.get('/', async (c) => {
       trendPoints = scheduleRows.slice(-10).map((row: any) => {
         try {
           const blocks: any[] = JSON.parse(row.generated_plan);
-          const active = blocks.filter(b => b.type !== 'break');
+          const active = blocks.filter(b => !isBreakOrRestBlock(b));
           const done = active.filter(b => b.status === 'done').length;
           const rate = active.length > 0 ? Math.round((done / active.length) * 100) : 0;
           const dObj = new Date(row.date);

@@ -415,17 +415,17 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-      <div className="w-full max-w-2xl max-h-[92vh] bg-luma-card border border-luma-card-border rounded-3xl shadow-2xl relative flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+      <div className="w-full sm:max-w-2xl max-h-[94vh] sm:max-h-[92vh] bg-luma-card border-t sm:border border-luma-card-border rounded-t-3xl sm:rounded-3xl shadow-2xl relative flex flex-col overflow-hidden">
         
         {/* 1. FIXED HEADER */}
-        <div className="px-6 py-4 sm:py-5 border-b border-white/[0.06] flex items-start justify-between shrink-0 bg-[#161716]">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-white/[0.06] flex items-start justify-between shrink-0 bg-[#161716]">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-2xl bg-[#2a3015] border border-luma-lime/30 flex items-center justify-center shrink-0 shadow-lime-glow">
               <Sparkles className="w-4 h-4 text-luma-lime" />
             </div>
             <div>
-              <h2 className="text-xl font-serif font-bold text-white tracking-tight flex items-center gap-2">
+              <h2 className="text-lg sm:text-xl font-serif font-bold text-white tracking-tight flex items-center gap-2 flex-wrap">
                 <span>
                   {targetDate ? (() => {
                     const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
@@ -498,7 +498,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
               </div>
 
               {/* Wake / Sleep Time Pickers */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-wider text-luma-text-dim mb-1.5">
                     <Sun className="w-3.5 h-3.5 text-amber-400" />
@@ -570,7 +570,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                 </div>
 
                 {/* Exact Work Start / End Inputs */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] font-mono uppercase tracking-wider text-luma-text-dim block mb-1">
                       Work Starts (Morning)
@@ -1538,32 +1538,35 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
           </div>
 
           {/* 3. STICKY FOOTER */}
-          <div className="px-6 py-3.5 border-t border-white/[0.06] bg-[#141514] flex items-center justify-between gap-3 shrink-0">
+          <div
+            className="px-4 sm:px-6 py-3 sm:py-3.5 border-t border-white/[0.06] bg-[#141514] flex items-center justify-between gap-2 sm:gap-3 shrink-0"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs text-luma-text-muted hover:text-white transition-colors"
+              className="px-3 sm:px-4 py-2 rounded-xl text-xs text-luma-text-muted hover:text-white transition-colors cursor-pointer"
             >
               Cancel
             </button>
 
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] font-mono text-luma-text-dim hidden sm:inline">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className="text-[11px] font-mono text-luma-text-dim hidden md:inline">
                 {selectedTaskIds.length} tasks • {selectedHabitIds.length} habits • {selectedLongTermGoalIds.length} roadmaps
               </span>
 
               <button
                 type="submit"
                 disabled={loading || isPastTarget}
-                className="flex items-center justify-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-6 py-2.5 rounded-xl font-semibold text-xs shadow-lime-glow active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-4 sm:px-6 py-2.5 rounded-xl font-semibold text-xs shadow-lime-glow active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
               >
                 <Sparkles className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>
                   {loading
-                    ? 'Synthesizing Merged Rhythm...'
+                    ? 'Synthesizing...'
                     : isPastTarget
-                    ? 'Cannot Shape Past Dates'
-                    : 'Generate Merged Timetable'}
+                    ? 'Cannot Shape Past'
+                    : 'Generate Timetable'}
                 </span>
               </button>
             </div>

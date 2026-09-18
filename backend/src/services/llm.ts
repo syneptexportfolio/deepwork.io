@@ -1,4 +1,4 @@
-import { Goal, Habit, QuestionnaireAnswers, ScheduleBlock, Task, WeeklyGoal } from '../types';
+import { Goal, Habit, QuestionnaireAnswers, ScheduleBlock, Task, WeeklyGoal, isBreakOrRestBlock } from '../types';
 
 export function extractTimeFromText(text: string): string | null {
   if (!text) return null;
@@ -93,7 +93,7 @@ export async function generateScheduleWithGemini(
     const deduplicatedBlocks: ScheduleBlock[] = [];
     for (const b of rawBlocks) {
       const norm = (b.title || '').toLowerCase().trim();
-      if (b.type !== 'break') {
+      if (!isBreakOrRestBlock(b)) {
         if (anchorHabitTitles.has(norm)) continue;
         if (seen.has(norm)) continue;
         seen.add(norm);
@@ -118,9 +118,9 @@ export function sanitizeScheduleBreaks(blocks: ScheduleBlock[]): ScheduleBlock[]
   const sanitized: ScheduleBlock[] = [];
 
   for (const block of sorted) {
-    if (block.type === 'break') {
+    if (isBreakOrRestBlock(block)) {
       const prevBlock = sanitized.length > 0 ? sanitized[sanitized.length - 1] : null;
-      if (prevBlock && prevBlock.type === 'break') {
+      if (prevBlock && isBreakOrRestBlock(prevBlock)) {
         const isCurrentLunch = (block.title || '').toLowerCase().includes('lunch') ||
                                (block.title || '').toLowerCase().includes('meal') ||
                                block.category === 'Lunch';

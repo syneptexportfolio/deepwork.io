@@ -334,16 +334,16 @@ export const HabitModal: React.FC<HabitModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-lg max-h-[90vh] bg-luma-card border border-luma-card-border rounded-3xl shadow-2xl relative flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+      <div className="w-full sm:max-w-lg max-h-[94vh] sm:max-h-[90vh] bg-luma-card border-t sm:border border-luma-card-border rounded-t-3xl sm:rounded-3xl shadow-2xl relative flex flex-col overflow-hidden">
         {/* FIXED HEADER */}
-        <div className="px-6 py-4 sm:py-5 border-b border-white/[0.06] flex items-start justify-between shrink-0 bg-[#161716]">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-white/[0.06] flex items-start justify-between shrink-0 bg-[#161716]">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className="w-7 h-7 rounded-xl bg-luma-purple-dim flex items-center justify-center text-luma-purple shrink-0">
                 <Flame className="w-4 h-4" />
               </div>
-              <h2 className="text-xl font-serif font-bold text-white tracking-tight">
+              <h2 className="text-lg sm:text-xl font-serif font-bold text-white tracking-tight">
                 {habit ? 'Edit Daily Habit' : 'New Daily Habit'}
               </h2>
             </div>
@@ -362,7 +362,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
 
         {/* SCROLLABLE FORM BODY & STICKY FOOTER */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <div className="px-6 py-4 overflow-y-auto space-y-4 flex-1">
+          <div className="px-4 sm:px-6 py-4 overflow-y-auto space-y-4 flex-1">
             {/* QUICK TEMPLATES */}
             {!habit && (
               <div className="pb-3 border-b border-white/[0.06]">
@@ -390,7 +390,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
             <label className="text-xs font-mono uppercase tracking-wider text-luma-text-dim block mb-1.5">
               1. Habit Tracking Style
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -589,7 +589,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
             <label className="text-xs font-mono uppercase tracking-wider text-luma-text-dim block mb-1.5">
               3. Time Anchor In Your Day
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setAnchor('morning')}
@@ -940,18 +940,21 @@ export const HabitModal: React.FC<HabitModalProps> = ({
           </div>
 
           {/* STICKY FOOTER */}
-          <div className="px-6 py-3.5 border-t border-white/[0.06] bg-[#141514] flex items-center justify-end gap-3 shrink-0">
+          <div
+            className="px-4 sm:px-6 py-3 sm:py-3.5 border-t border-white/[0.06] bg-[#141514] flex items-center justify-between sm:justify-end gap-3 shrink-0"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs text-luma-text-muted hover:text-white transition-colors"
+              className="px-3 sm:px-4 py-2 rounded-xl text-xs text-luma-text-muted hover:text-white transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="bg-luma-lime hover:bg-luma-lime-hover text-black px-5 py-2.5 rounded-xl font-semibold text-xs shadow-lime-glow transition-all disabled:opacity-50"
+              className="bg-luma-lime hover:bg-luma-lime-hover text-black px-4 sm:px-5 py-2.5 rounded-xl font-semibold text-xs shadow-lime-glow transition-all disabled:opacity-50 cursor-pointer whitespace-nowrap"
             >
               {loading ? 'Saving...' : habit ? 'Save changes' : 'Create habit'}
             </button>

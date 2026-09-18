@@ -146,3 +146,37 @@ export interface ScheduleBlock {
   is_untimed?: boolean;
 }
 
+export function isBreakOrRestBlock(block: {
+  type?: string;
+  block_source?: string;
+  category?: string | null;
+  title?: string;
+}): boolean {
+  if (!block) return false;
+  if (block.type === 'break' || block.block_source === 'break') return true;
+
+  const cat = (block.category || '').toLowerCase().trim();
+  if (cat === 'rest & hydration' || cat === 'break' || cat === 'lunch' || cat === 'rest') {
+    return true;
+  }
+
+  const title = (block.title || '').toLowerCase().trim();
+  if (
+    title.includes('lunch') ||
+    title.includes('recharge') ||
+    title.includes('coffee break') ||
+    title.includes('tea break') ||
+    title.includes('step away') ||
+    title.includes('power nap') ||
+    title === 'break' ||
+    title === 'brake' ||
+    title === 'rest' ||
+    title === 'nap' ||
+    title.startsWith('break:') ||
+    title.startsWith('rest:')
+  ) {
+    return true;
+  }
+
+  return false;
+}

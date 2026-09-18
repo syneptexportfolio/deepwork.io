@@ -100,10 +100,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-xl max-h-[90vh] bg-luma-card border border-luma-card-border rounded-3xl shadow-2xl relative flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+      <div className="w-full sm:max-w-xl max-h-[94vh] sm:max-h-[90vh] bg-luma-card border border-luma-card-border rounded-t-3xl sm:rounded-3xl shadow-2xl relative flex flex-col overflow-hidden">
         {/* FIXED HEADER */}
-        <div className="px-6 py-4 sm:py-5 border-b border-white/[0.06] flex items-start justify-between shrink-0 bg-[#161716]">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-white/[0.06] flex items-start justify-between shrink-0 bg-[#161716]">
           <div>
             <h2 className="text-xl font-serif font-bold text-white tracking-tight mb-0.5">
               Settings & Integrations
@@ -122,7 +122,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* SCROLLABLE BODY */}
-        <div className="px-6 py-4 overflow-y-auto space-y-6 flex-1">
+        <div className="px-4 sm:px-6 py-4 overflow-y-auto space-y-6 flex-1">
           {/* AI Engine Section */}
           <div className="p-4 rounded-2xl bg-[#1a1c1a] border border-luma-card-border">
             <div className="flex items-center gap-2 mb-2">
@@ -181,7 +181,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 />
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 pt-2">
                 <button
                   type="button"
                   onClick={handleTestTelegram}
@@ -370,7 +370,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* STICKY FOOTER */}
-        <div className="px-6 py-3.5 border-t border-white/[0.06] bg-[#141514] flex items-center justify-end shrink-0">
+        <div className="px-4 sm:px-6 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] border-t border-white/[0.06] bg-[#141514] flex items-center justify-end shrink-0">
           <button
             type="button"
             onClick={onClose}

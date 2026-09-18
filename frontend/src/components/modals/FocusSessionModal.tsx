@@ -53,10 +53,10 @@ export const FocusSessionModal: React.FC<FocusSessionModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-      <div className="w-full max-w-md max-h-[92vh] overflow-y-auto bg-luma-card border border-luma-card-border rounded-3xl p-6 sm:p-8 shadow-2xl relative text-center">
+      <div className="w-full max-w-md max-h-[92vh] overflow-y-auto bg-luma-card border border-luma-card-border rounded-3xl p-5 sm:p-8 shadow-2xl relative text-center">
         <button
           onClick={onClose}
-          className="absolute top-6 right-6 p-2 rounded-full hover:bg-white/5 text-luma-text-muted hover:text-white transition-colors"
+          className="absolute top-4 sm:top-6 right-4 sm:right-6 p-2 rounded-full hover:bg-white/5 text-luma-text-muted hover:text-white transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -65,13 +65,13 @@ export const FocusSessionModal: React.FC<FocusSessionModalProps> = ({
           FOCUS IN PROGRESS
         </div>
 
-        <h3 className="text-2xl font-serif font-bold text-white mb-8">
+        <h3 className="text-xl sm:text-2xl font-serif font-bold text-white mb-6 sm:mb-8 break-words px-4">
           {taskTitle}
         </h3>
 
         {/* Circular Timer Display */}
-        <div className="relative w-56 h-56 mx-auto mb-8 flex items-center justify-center">
-          <svg className="w-full h-full -rotate-90">
+        <div className="relative w-48 h-48 sm:w-56 sm:h-56 mx-auto mb-6 sm:mb-8 flex items-center justify-center">
+          <svg className="w-full h-full -rotate-90" viewBox="0 0 224 224">
             <circle
               cx="112"
               cy="112"
@@ -92,7 +92,7 @@ export const FocusSessionModal: React.FC<FocusSessionModalProps> = ({
           </svg>
 
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-5xl font-mono font-bold text-white tracking-tight">
+            <span className="text-4xl sm:text-5xl font-mono font-bold text-white tracking-tight">
               {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
             </span>
             <span className="text-xs font-mono text-luma-text-muted mt-1">
@@ -102,7 +102,7 @@ export const FocusSessionModal: React.FC<FocusSessionModalProps> = ({
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-center gap-4 mb-6">
+        <div className="flex items-center justify-center gap-3 sm:gap-4 mb-6">
           <button
             onClick={() => setSecondsLeft(totalSeconds)}
             title="Reset"

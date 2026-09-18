@@ -42,7 +42,11 @@ export default {
       boxShadow: {
         'lime-glow': '0 0 24px -4px rgba(212, 249, 56, 0.35)',
         'purple-glow': '0 0 28px -6px rgba(123, 110, 246, 0.35)',
-      }
+      },
+      screens: {
+        'xs': '375px',
+        'mobile-lg': '425px',
+      },
     },
   },
   plugins: [],

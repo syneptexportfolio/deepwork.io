@@ -222,16 +222,16 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-lg max-h-[90vh] bg-luma-card border border-luma-card-border rounded-3xl shadow-2xl relative flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+      <div className="w-full sm:max-w-lg max-h-[94vh] sm:max-h-[90vh] bg-luma-card border-t sm:border border-luma-card-border rounded-t-3xl sm:rounded-3xl shadow-2xl relative flex flex-col overflow-hidden">
         {/* FIXED HEADER */}
-        <div className="px-6 py-4 sm:py-5 border-b border-white/[0.06] flex items-start justify-between shrink-0 bg-[#161716]">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-white/[0.06] flex items-start justify-between shrink-0 bg-[#161716]">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-[#2a3015] border border-luma-lime/30 flex items-center justify-center text-luma-lime shrink-0">
               <CheckSquare className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-xl font-serif font-bold text-white tracking-tight mb-0.5">
+              <h2 className="text-lg sm:text-xl font-serif font-bold text-white tracking-tight mb-0.5">
                 {task ? 'Edit Task' : 'New Task'}
               </h2>
               <p className="text-xs text-luma-text-muted">
@@ -250,7 +250,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
         {/* SCROLLABLE FORM BODY & STICKY FOOTER */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <div className="px-6 py-4 overflow-y-auto space-y-4 flex-1">
+          <div className="px-4 sm:px-6 py-4 overflow-y-auto space-y-4 flex-1">
             {/* QUICK-START PRESETS */}
             {!task && (
               <div className="pb-3 border-b border-white/[0.06]">
@@ -621,23 +621,26 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           </div>
 
           {/* PERMANENT STICKY BOTTOM FOOTER (Always visible, never cut off!) */}
-          <div className="px-6 py-3.5 border-t border-white/[0.06] bg-[#141514] flex items-center justify-between shrink-0">
+          <div
+            className="px-4 sm:px-6 py-3 sm:py-3.5 border-t border-white/[0.06] bg-[#141514] flex items-center justify-between gap-2 shrink-0"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
             {task && onDelete ? (
               isConfirmingDelete ? (
-                <div className="flex items-center gap-2 bg-[#2a1717] border border-red-500/30 px-3 py-1.5 rounded-2xl animate-fadeIn">
-                  <span className="text-xs text-red-300 font-medium">Delete task?</span>
+                <div className="flex items-center gap-1.5 sm:gap-2 bg-[#2a1717] border border-red-500/30 px-2.5 sm:px-3 py-1.5 rounded-2xl animate-fadeIn">
+                  <span className="text-[11px] sm:text-xs text-red-300 font-medium">Delete?</span>
                   <button
                     type="button"
                     onClick={handleConfirmDelete}
                     disabled={loading}
-                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-xl text-xs font-semibold shadow-sm transition-all active:scale-95 disabled:opacity-50"
+                    className="bg-red-500 hover:bg-red-600 text-white px-2.5 sm:px-3 py-1 rounded-xl text-xs font-semibold shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                   >
-                    Confirm Delete
+                    Confirm
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsConfirmingDelete(false)}
-                    className="text-luma-text-muted hover:text-white px-2 py-1 text-xs"
+                    className="text-luma-text-muted hover:text-white px-1.5 py-1 text-xs cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -646,7 +649,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsConfirmingDelete(true)}
-                  className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 p-2 rounded-xl hover:bg-red-500/10 transition-colors"
+                  className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 p-2 rounded-xl hover:bg-red-500/10 transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>Delete</span>
@@ -654,18 +657,18 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               )
             ) : <div />}
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs text-luma-text-muted hover:text-white transition-colors"
+                className="px-3 sm:px-4 py-2 rounded-xl text-xs text-luma-text-muted hover:text-white transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading || !title.trim()}
-                className="bg-luma-lime hover:bg-luma-lime-hover text-black px-5 py-2.5 rounded-xl font-semibold text-xs shadow-lime-glow transition-all disabled:opacity-50 active:scale-95"
+                className="bg-luma-lime hover:bg-luma-lime-hover text-black px-4 sm:px-5 py-2.5 rounded-xl font-semibold text-xs shadow-lime-glow transition-all disabled:opacity-50 active:scale-95 cursor-pointer whitespace-nowrap"
               >
                 {loading ? 'Saving...' : task ? 'Save changes' : 'Create task'}
               </button>

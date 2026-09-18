@@ -175,45 +175,45 @@ export const Tasks: React.FC<TasksProps> = ({
   return (
     <div className="space-y-8 animate-fadeIn">
       {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
         <div>
-          <div className="text-[11px] font-mono tracking-widest uppercase text-luma-text-dim mb-1">
+          <div className="text-[10px] xs:text-[11px] font-mono tracking-widest uppercase text-luma-text-dim mb-1">
             Commitments, Not Clutter
           </div>
-          <h1 className="text-4xl md:text-5xl font-serif text-white tracking-tight mb-2">
+          <h1 className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl font-serif text-white tracking-tight mb-1.5 xs:mb-2">
             Tasks & Cadence
           </h1>
-          <p className="text-sm text-luma-text-muted">
+          <p className="text-xs sm:text-sm text-luma-text-muted">
             Manage daily to-dos, monthly habits, and weekly target pacing.
           </p>
         </div>
 
         {/* Dynamic Action Buttons */}
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {activeSection === 'todos' && (
             <button
               onClick={onAddTask}
-              className="flex items-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-4 py-2.5 rounded-xl font-semibold text-sm shadow-lime-glow active:scale-95 transition-all"
+              className="flex items-center gap-1.5 xs:gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-3 xs:px-4 py-2 xs:py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-lime-glow active:scale-95 transition-all cursor-pointer"
             >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <Plus className="w-3.5 h-3.5 xs:w-4 xs:h-4 stroke-[2.5]" />
               <span>Add to-do</span>
             </button>
           )}
           {activeSection === 'habits' && (
             <button
               onClick={onAddHabit}
-              className="flex items-center gap-2 bg-luma-purple hover:bg-luma-purple-glow text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-purple-glow active:scale-95 transition-all"
+              className="flex items-center gap-1.5 xs:gap-2 bg-luma-purple hover:bg-luma-purple-glow text-white px-3 xs:px-4 py-2 xs:py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-purple-glow active:scale-95 transition-all cursor-pointer"
             >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <Plus className="w-3.5 h-3.5 xs:w-4 xs:h-4 stroke-[2.5]" />
               <span>Add habit</span>
             </button>
           )}
           {activeSection === 'weekly' && (
             <button
               onClick={onAddWeeklyGoal}
-              className="flex items-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-4 py-2.5 rounded-xl font-semibold text-sm shadow-lime-glow active:scale-95 transition-all"
+              className="flex items-center gap-1.5 xs:gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-3 xs:px-4 py-2 xs:py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-lime-glow active:scale-95 transition-all cursor-pointer"
             >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <Plus className="w-3.5 h-3.5 xs:w-4 xs:h-4 stroke-[2.5]" />
               <span>New weekly goal</span>
             </button>
           )}
@@ -221,41 +221,41 @@ export const Tasks: React.FC<TasksProps> = ({
       </div>
 
       {/* 3-Tier Horizon Switcher */}
-      <div className="flex items-center gap-3 border-b border-white/[0.06] pb-4">
+      <div className="flex items-center gap-1.5 xs:gap-2 sm:gap-3 border-b border-white/[0.06] pb-2.5 xs:pb-3 sm:pb-4 overflow-x-auto scrollbar-none flex-nowrap">
         <button
           onClick={() => setActiveSection('todos')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-semibold transition-all ${
+          className={`shrink-0 flex items-center gap-1.5 xs:gap-2 px-2.5 xs:px-3.5 sm:px-5 py-1.5 xs:py-2 sm:py-2.5 rounded-xl xs:rounded-2xl text-[11px] xs:text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
             activeSection === 'todos'
               ? 'bg-luma-cream text-luma-cream-text shadow-sm'
               : 'text-luma-text-muted hover:text-white hover:bg-white/[0.03]'
           }`}
         >
           <span>🟢 Today's To-Dos</span>
-          <span className="text-[11px] font-mono opacity-60">({tasks.length})</span>
+          <span className="text-[10px] xs:text-[11px] font-mono opacity-60">({tasks.length})</span>
         </button>
 
         <button
           onClick={() => setActiveSection('habits')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-semibold transition-all ${
+          className={`shrink-0 flex items-center gap-1.5 xs:gap-2 px-2.5 xs:px-3.5 sm:px-5 py-1.5 xs:py-2 sm:py-2.5 rounded-xl xs:rounded-2xl text-[11px] xs:text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
             activeSection === 'habits'
               ? 'bg-luma-cream text-luma-cream-text shadow-sm'
               : 'text-luma-text-muted hover:text-white hover:bg-white/[0.03]'
           }`}
         >
           <span>🟣 Daily Habits</span>
-          <span className="text-[11px] font-mono opacity-60">({habits.length})</span>
+          <span className="text-[10px] xs:text-[11px] font-mono opacity-60">({habits.length})</span>
         </button>
 
         <button
           onClick={() => setActiveSection('weekly')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-semibold transition-all ${
+          className={`shrink-0 flex items-center gap-1.5 xs:gap-2 px-2.5 xs:px-3.5 sm:px-5 py-1.5 xs:py-2 sm:py-2.5 rounded-xl xs:rounded-2xl text-[11px] xs:text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
             activeSection === 'weekly'
               ? 'bg-luma-cream text-luma-cream-text shadow-sm'
               : 'text-luma-text-muted hover:text-white hover:bg-white/[0.03]'
           }`}
         >
           <span>⚡ Weekly Goals</span>
-          <span className="text-[11px] font-mono opacity-60">({weeklyGoals.length})</span>
+          <span className="text-[10px] xs:text-[11px] font-mono opacity-60">({weeklyGoals.length})</span>
         </button>
       </div>
 
@@ -263,34 +263,34 @@ export const Tasks: React.FC<TasksProps> = ({
       {activeSection === 'todos' && (
         <div className="space-y-6">
           {/* Rapid Morning Brain Dump Input Bar */}
-          <form onSubmit={handleQuickSubmit} className="flex items-center gap-3">
+          <form onSubmit={handleQuickSubmit} className="flex items-center gap-2 xs:gap-3">
             <input
               type="text"
               value={quickTitle}
               onChange={(e) => setQuickTitle(e.target.value)}
-              placeholder="Quick add today's to-do (e.g. Reply to emails 20m) & press Enter..."
-              className="flex-1 bg-luma-card border border-luma-card-border focus:border-luma-lime rounded-2xl px-5 py-3 text-sm text-white placeholder:text-luma-text-dim focus:outline-none transition-all shadow-inner"
+              placeholder="Quick add today's to-do (e.g. Reply to emails 20m)..."
+              className="flex-1 bg-luma-card border border-luma-card-border focus:border-luma-lime rounded-xl xs:rounded-2xl px-3.5 xs:px-5 py-2.5 xs:py-3 text-xs sm:text-sm text-white placeholder:text-luma-text-dim focus:outline-none transition-all shadow-inner min-w-0"
             />
             <button
               type="submit"
               disabled={isAdding || !quickTitle.trim()}
-              className="bg-[#242824] hover:bg-luma-lime hover:text-black text-white px-5 py-3 rounded-2xl text-xs font-semibold transition-all disabled:opacity-40"
+              className="bg-[#242824] hover:bg-luma-lime hover:text-black text-white px-3.5 xs:px-5 py-2.5 xs:py-3 rounded-xl xs:rounded-2xl text-xs font-semibold transition-all disabled:opacity-40 shrink-0"
             >
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
           {/* Minimal Filter Row */}
-          <div className="flex items-center justify-between flex-wrap gap-2 px-1">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-mono uppercase text-luma-text-dim tracking-wider">
+          <div className="flex items-center justify-between flex-wrap gap-2 px-0.5 xs:px-1">
+            <div className="flex items-center gap-1.5 xs:gap-2 flex-wrap">
+              <span className="text-[10px] xs:text-[11px] font-mono uppercase text-luma-text-dim tracking-wider">
                 Filter:
               </span>
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1 xs:gap-1.5 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setTaskFilter('all')}
-                  className={`px-3 py-1 rounded-xl text-xs font-mono transition-all ${
+                  className={`px-2 xs:px-3 py-1 rounded-lg xs:rounded-xl text-[10px] xs:text-xs font-mono transition-all ${
                     taskFilter === 'all'
                       ? 'bg-white text-black font-semibold shadow-sm'
                       : 'bg-white/[0.04] text-luma-text-muted hover:text-white hover:bg-white/[0.08]'
@@ -301,35 +301,35 @@ export const Tasks: React.FC<TasksProps> = ({
                 <button
                   type="button"
                   onClick={() => setTaskFilter('deep_focus')}
-                  className={`px-3 py-1 rounded-xl text-xs font-mono transition-all flex items-center gap-1.5 ${
+                  className={`px-2 xs:px-3 py-1 rounded-lg xs:rounded-xl text-[10px] xs:text-xs font-mono transition-all flex items-center gap-1 xs:gap-1.5 ${
                     taskFilter === 'deep_focus'
                       ? 'bg-luma-purple text-white font-semibold shadow-purple-glow'
                       : 'bg-white/[0.04] text-luma-purple hover:bg-luma-purple/20'
                   }`}
                 >
-                  <span>🟣 Deep Work</span>
-                  <span className="opacity-70 text-[10px]">
+                  <span>🟣 Deep</span>
+                  <span className="opacity-70 text-[9px] xs:text-[10px]">
                     ({tasks.filter(t => t.energy_level === 'deep_focus').length})
                   </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setTaskFilter('light')}
-                  className={`px-3 py-1 rounded-xl text-xs font-mono transition-all flex items-center gap-1.5 ${
+                  className={`px-2 xs:px-3 py-1 rounded-lg xs:rounded-xl text-[10px] xs:text-xs font-mono transition-all flex items-center gap-1 xs:gap-1.5 ${
                     taskFilter === 'light'
                       ? 'bg-luma-lime text-black font-semibold shadow-lime-glow'
                       : 'bg-white/[0.04] text-luma-lime hover:bg-luma-lime/20'
                   }`}
                 >
                   <span>🟢 Light</span>
-                  <span className="opacity-70 text-[10px]">
+                  <span className="opacity-70 text-[9px] xs:text-[10px]">
                     ({tasks.filter(t => t.energy_level === 'light').length})
                   </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setTaskFilter('pending')}
-                  className={`px-3 py-1 rounded-xl text-xs font-mono transition-all ${
+                  className={`px-2 xs:px-3 py-1 rounded-lg xs:rounded-xl text-[10px] xs:text-xs font-mono transition-all ${
                     taskFilter === 'pending'
                       ? 'bg-amber-400 text-black font-semibold shadow-sm'
                       : 'bg-white/[0.04] text-amber-300 hover:bg-amber-400/20'
@@ -340,7 +340,7 @@ export const Tasks: React.FC<TasksProps> = ({
                 <button
                   type="button"
                   onClick={() => setTaskFilter('done')}
-                  className={`px-3 py-1 rounded-xl text-xs font-mono transition-all ${
+                  className={`px-2 xs:px-3 py-1 rounded-lg xs:rounded-xl text-[10px] xs:text-xs font-mono transition-all ${
                     taskFilter === 'done'
                       ? 'bg-emerald-400 text-black font-semibold shadow-sm'
                       : 'bg-white/[0.04] text-emerald-300 hover:bg-emerald-400/20'
@@ -406,14 +406,14 @@ export const Tasks: React.FC<TasksProps> = ({
       {activeSection === 'habits' && (
         <div className="space-y-6">
 
-          <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 flex items-center justify-between">
+          <div className="bg-luma-card border border-luma-card-border rounded-3xl p-4 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h3 className="text-base font-semibold text-white mb-1">Monthly Habit Routines</h3>
               <p className="text-xs text-luma-text-muted">
                 Configured once a month. These repeat automatically and anchor into every daily schedule generated.
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
               <span className="text-xs font-mono text-luma-purple bg-luma-purple-dim px-3 py-1.5 rounded-full">
                 {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }).format(new Date())}
               </span>
@@ -500,7 +500,7 @@ export const Tasks: React.FC<TasksProps> = ({
                 <div
                   key={habit.id}
                   onClick={() => onEditHabit(habit)}
-                  className="bg-luma-card border border-luma-card-border hover:border-white/20 rounded-3xl p-6 transition-all relative flex flex-col justify-between cursor-pointer group"
+                  className="bg-luma-card border border-luma-card-border hover:border-white/20 rounded-2xl xs:rounded-3xl p-3.5 xs:p-5 sm:p-6 transition-all relative flex flex-col justify-between cursor-pointer group"
                 >
                   <div>
                     <div className="flex items-center justify-between mb-3">
@@ -660,14 +660,14 @@ export const Tasks: React.FC<TasksProps> = ({
       {activeSection === 'weekly' && (
         <div className="space-y-6">
 
-          <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 flex items-center justify-between">
+          <div className="bg-luma-card border border-luma-card-border rounded-3xl p-4 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h3 className="text-base font-semibold text-white mb-1">Weekly Target Goals</h3>
               <p className="text-xs text-luma-text-muted">
                 7-day cumulative milestone targets. Track your weekly pacing and review completed outcomes at the end of each week.
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
               <span className="text-xs font-mono text-luma-lime bg-[#212b10] px-3 py-1.5 rounded-full">
                 Weekly Cadence Active
               </span>
@@ -803,15 +803,15 @@ export const Tasks: React.FC<TasksProps> = ({
                 <div
                   key={wg.id}
                   onClick={() => onEditWeeklyGoal(wg)}
-                  className={`bg-luma-card border rounded-3xl p-6 transition-all cursor-pointer group ${
+                  className={`bg-luma-card border rounded-2xl xs:rounded-3xl p-3.5 xs:p-5 sm:p-6 transition-all cursor-pointer group ${
                     isAchieved
                       ? 'border-emerald-500/30 hover:border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.08)]'
                       : 'border-luma-card-border hover:border-white/20'
                   }`}
                 >
-                  <div className="flex items-start justify-between mb-2">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-3">
                     <div>
-                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <div className="flex items-center gap-1.5 xs:gap-2 mb-1.5 flex-wrap">
                         <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-md border tracking-wider uppercase ${badgeStyle.color}`}>
                           {badgeStyle.label}
                         </span>
@@ -830,16 +830,16 @@ export const Tasks: React.FC<TasksProps> = ({
                           {wg.priority} PRIORITY
                         </span>
                       </div>
-                      <h4 className="text-base font-semibold text-white group-hover:text-luma-lime transition-colors">
+                      <h4 className="text-sm xs:text-base font-semibold text-white group-hover:text-luma-lime transition-colors">
                         {wg.title}
                       </h4>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 xs:gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end w-full sm:w-auto pt-1 sm:pt-0 border-t sm:border-t-0 border-white/[0.04]">
                       {/* Stepper Controls */}
                       <div
                         onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-1 bg-[#1a1c1a] border border-white/[0.08] rounded-xl px-2 py-0.5 shadow-sm"
+                        className="flex items-center gap-1 bg-[#1a1c1a] border border-white/[0.08] rounded-xl px-1.5 xs:px-2 py-1 shadow-sm shrink-0"
                       >
                         <button
                           type="button"
@@ -847,10 +847,10 @@ export const Tasks: React.FC<TasksProps> = ({
                           onClick={() => {
                             onUpdateWeeklyGoalProgress?.(wg.id, Math.max(0, wg.completed_units - 1));
                           }}
-                          className="w-5 h-5 rounded-lg bg-white/5 hover:bg-white/15 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center text-white/70 hover:text-white transition-all text-xs active:scale-90"
+                          className="w-6 h-6 sm:w-5 sm:h-5 rounded-lg bg-white/5 hover:bg-white/15 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center text-white/70 hover:text-white transition-all text-xs active:scale-90 cursor-pointer"
                           title="Decrease 1 unit"
                         >
-                          <Minus className="w-3 h-3" />
+                          <Minus className="w-3.5 h-3.5" />
                         </button>
 
                         <span
@@ -876,10 +876,10 @@ export const Tasks: React.FC<TasksProps> = ({
                           onClick={() => {
                             onUpdateWeeklyGoalProgress?.(wg.id, Math.min(wg.target_units, wg.completed_units + 1));
                           }}
-                          className="w-5 h-5 rounded-lg bg-luma-lime/15 hover:bg-luma-lime/25 text-luma-lime disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center transition-all text-xs font-bold active:scale-90 shadow-sm"
+                          className="w-6 h-6 sm:w-5 sm:h-5 rounded-lg bg-luma-lime/15 hover:bg-luma-lime/25 text-luma-lime disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center transition-all text-xs font-bold active:scale-90 shadow-sm cursor-pointer"
                           title="Add 1 unit"
                         >
-                          <Plus className="w-3 h-3" />
+                          <Plus className="w-3.5 h-3.5" />
                         </button>
                       </div>
 

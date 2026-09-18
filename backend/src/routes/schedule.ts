@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { Env, Goal, QuestionnaireAnswers, ScheduleBlock, Task } from '../types';
+import { Env, Goal, QuestionnaireAnswers, ScheduleBlock, Task, isBreakOrRestBlock } from '../types';
 import { generateScheduleWithGemini, sanitizeScheduleBreaks } from '../services/llm';
 
 export const scheduleRouter = new Hono<{ Bindings: Env }>();
@@ -44,7 +44,7 @@ export async function pruneOrResetSchedule(db: any, date: string): Promise<Sched
     const weeklyGoalTitles: string[] = allWeeklyGoals.map((w: any) => w.title.toLowerCase());
 
     const filteredBlocks = blocks.filter((b: any) => {
-      if (b.type === 'break') return true;
+      if (isBreakOrRestBlock(b)) return true;
 
       // Filter out check_off rituals and target metrics (they belong in Daily Anchors card)
       const normTitle = (b.title || '').toLowerCase().trim();
@@ -68,7 +68,7 @@ export async function pruneOrResetSchedule(db: any, date: string): Promise<Sched
     });
 
     const sanitizedBlocks = sanitizeScheduleBreaks(filteredBlocks);
-    const nonBreakBlocks = sanitizedBlocks.filter(b => b.type !== 'break');
+    const nonBreakBlocks = sanitizedBlocks.filter(b => !isBreakOrRestBlock(b));
     if (nonBreakBlocks.length === 0) {
       await db.prepare('DELETE FROM schedules WHERE id = ?').bind(row.id).run();
       return [];
@@ -163,7 +163,7 @@ scheduleRouter.get('/week', async (c) => {
     const days = weekDates.map((dateStr, idx) => {
       const rawBlocks = scheduleMap.get(dateStr) || [];
       const blocks: ScheduleBlock[] = Array.isArray(rawBlocks) ? rawBlocks : [];
-      const nonBreak = blocks.filter(b => b.type !== 'break');
+      const nonBreak = blocks.filter(b => !isBreakOrRestBlock(b));
       const focusMinutes = blocks
         .filter(b => b.type === 'deep_focus')
         .reduce((acc, b) => acc + (b.duration || 0), 0);
@@ -208,7 +208,7 @@ scheduleRouter.get('/active-dates', async (c) => {
     for (const r of (results || [])) {
       try {
         const blocks = JSON.parse(r.generated_plan || '[]');
-        if (Array.isArray(blocks) && blocks.filter((b: any) => b.type !== 'break').length > 0) {
+        if (Array.isArray(blocks) && blocks.filter((b: any) => !isBreakOrRestBlock(b)).length > 0) {
           activeDates.push(r.date);
         }
       } catch {}
@@ -663,7 +663,7 @@ scheduleRouter.get('/monthly-task-points', async (c) => {
     for (const row of (results || [])) {
       try {
         const blocks: ScheduleBlock[] = JSON.parse(row.generated_plan || '[]');
-        const activeBlocks = blocks.filter(b => b.type !== 'break');
+        const activeBlocks = blocks.filter(b => !isBreakOrRestBlock(b));
         const completed = activeBlocks.filter(b => b.status === 'done').length;
         map[row.date] = { completed, total: activeBlocks.length };
       } catch {
@@ -718,7 +718,7 @@ scheduleRouter.get('/yearly-task-points', async (c) => {
       }
       try {
         const blocks: ScheduleBlock[] = JSON.parse(row.generated_plan || '[]');
-        const activeBlocks = blocks.filter(b => b.type !== 'break');
+        const activeBlocks = blocks.filter(b => !isBreakOrRestBlock(b));
         const completed = activeBlocks.filter(b => b.status === 'done').length;
         map[mStr].completed += completed;
         map[mStr].total += activeBlocks.length;

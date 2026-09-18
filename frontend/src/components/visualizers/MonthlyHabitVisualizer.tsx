@@ -107,7 +107,7 @@ export const MonthlyHabitVisualizer: React.FC<MonthlyHabitVisualizerProps> = ({ 
   }, [activeHabits, averageStreak, calendarData.todayDate]);
 
   return (
-    <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 relative overflow-hidden transition-all shadow-md">
+    <div className="bg-luma-card border border-luma-card-border rounded-2xl xs:rounded-3xl p-3.5 xs:p-5 sm:p-6 relative overflow-hidden transition-all shadow-md">
       {/* Background glow */}
       <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-luma-purple/10 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-amber-500/5 blur-3xl pointer-events-none" />
@@ -136,33 +136,33 @@ export const MonthlyHabitVisualizer: React.FC<MonthlyHabitVisualizerProps> = ({ 
           </div>
 
           {/* KPI Stat Badges */}
-          <div className="grid grid-cols-3 gap-2 pt-1">
-            <div className="bg-[#141614] border border-white/[0.04] rounded-2xl p-3 text-center">
-              <div className="text-[10px] font-mono uppercase text-luma-text-dim flex items-center justify-center gap-1">
+          <div className="grid grid-cols-3 gap-1.5 xs:gap-2 pt-1">
+            <div className="bg-[#141614] border border-white/[0.04] rounded-xl xs:rounded-2xl p-2 xs:p-2.5 sm:p-3 text-center">
+              <div className="text-[9px] xs:text-[10px] font-mono uppercase text-luma-text-dim flex items-center justify-center gap-1">
                 <Flame className="w-3 h-3 text-amber-400 fill-amber-400" />
                 <span>Best</span>
               </div>
-              <div className="text-base font-mono font-bold text-amber-400 mt-0.5">
+              <div className="text-xs xs:text-sm sm:text-base font-mono font-bold text-amber-400 mt-0.5">
                 {bestStreak}d
               </div>
             </div>
 
-            <div className="bg-[#141614] border border-white/[0.04] rounded-2xl p-3 text-center">
-              <div className="text-[10px] font-mono uppercase text-luma-text-dim flex items-center justify-center gap-1">
+            <div className="bg-[#141614] border border-white/[0.04] rounded-xl xs:rounded-2xl p-2 xs:p-2.5 sm:p-3 text-center">
+              <div className="text-[9px] xs:text-[10px] font-mono uppercase text-luma-text-dim flex items-center justify-center gap-1">
                 <Award className="w-3 h-3 text-luma-purple" />
                 <span>Average</span>
               </div>
-              <div className="text-base font-mono font-bold text-luma-purple mt-0.5">
+              <div className="text-xs xs:text-sm sm:text-base font-mono font-bold text-luma-purple mt-0.5">
                 {averageStreak}d
               </div>
             </div>
 
-            <div className="bg-[#141614] border border-white/[0.04] rounded-2xl p-3 text-center">
-              <div className="text-[10px] font-mono uppercase text-luma-text-dim flex items-center justify-center gap-1">
+            <div className="bg-[#141614] border border-white/[0.04] rounded-xl xs:rounded-2xl p-2 xs:p-2.5 sm:p-3 text-center">
+              <div className="text-[9px] xs:text-[10px] font-mono uppercase text-luma-text-dim flex items-center justify-center gap-1">
                 <Sparkles className="w-3 h-3 text-luma-lime" />
                 <span>Adherence</span>
               </div>
-              <div className="text-base font-mono font-bold text-luma-lime mt-0.5">
+              <div className="text-xs xs:text-sm sm:text-base font-mono font-bold text-luma-lime mt-0.5">
                 {totalHabits > 0 ? `${monthlyAdherence}%` : '0%'}
               </div>
             </div>
@@ -171,14 +171,14 @@ export const MonthlyHabitVisualizer: React.FC<MonthlyHabitVisualizerProps> = ({ 
 
         {/* Right: Current Month Visual Calendar Heatmap (7 cols) */}
         <div className="md:col-span-7 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-luma-text-dim" />
               <span className="text-xs font-mono text-white font-medium">
                 {calendarData.currentMonthName} Cadence Map
               </span>
             </div>
-            <div className="flex items-center gap-3 text-[10px] font-mono text-luma-text-dim">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[9px] xs:text-[10px] font-mono text-luma-text-dim">
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded bg-[#1d201d]" /> Less
               </span>
@@ -192,9 +192,9 @@ export const MonthlyHabitVisualizer: React.FC<MonthlyHabitVisualizerProps> = ({ 
           </div>
 
           {/* Calendar Heatmap Grid (7 Columns: Mon to Sun) */}
-          <div className="bg-[#121412] border border-white/[0.04] rounded-2xl p-3.5 space-y-2">
+          <div className="bg-[#121412] border border-white/[0.04] rounded-2xl p-2 xs:p-2.5 sm:p-3.5 space-y-2">
             {/* Weekday Headers */}
-            <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-mono text-luma-text-dim">
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5 text-center text-[9px] xs:text-[10px] font-mono text-luma-text-dim">
               <span>M</span>
               <span>T</span>
               <span>W</span>
@@ -205,10 +205,10 @@ export const MonthlyHabitVisualizer: React.FC<MonthlyHabitVisualizerProps> = ({ 
             </div>
 
             {/* Day Slots */}
-            <div className="grid grid-cols-7 gap-1.5">
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
               {/* Empty leading padding slots */}
               {Array.from({ length: calendarData.leadingEmptySlots }).map((_, idx) => (
-                <div key={`empty-${idx}`} className="h-7 rounded-lg bg-transparent" />
+                <div key={`empty-${idx}`} className="h-6 sm:h-7 rounded-md xs:rounded-lg bg-transparent" />
               ))}
 
               {/* Real month days */}
@@ -241,7 +241,7 @@ export const MonthlyHabitVisualizer: React.FC<MonthlyHabitVisualizerProps> = ({ 
                 return (
                   <div
                     key={day.dayNumber}
-                    className={`h-7 rounded-lg flex items-center justify-center text-[10px] font-mono transition-transform hover:scale-110 cursor-pointer ${cellStyle}`}
+                    className={`h-6 sm:h-7 rounded-md xs:rounded-lg flex items-center justify-center text-[8px] xs:text-[9px] sm:text-[10px] font-mono transition-transform hover:scale-110 cursor-pointer ${cellStyle}`}
                     title={`Day ${day.dayNumber}: ${day.isToday ? "Today" : day.isPast ? (day.intensity > 0 ? `${day.intensity}% completed` : "No activity recorded") : "Upcoming"}`}
                   >
                     {day.dayNumber}

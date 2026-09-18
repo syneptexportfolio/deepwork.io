@@ -189,16 +189,16 @@ export const AddTimelineTaskModal: React.FC<AddTimelineTaskModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="relative w-full max-w-lg bg-[#141514] border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl text-white space-y-6">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+      <div className="relative w-full sm:max-w-lg max-h-[94vh] sm:max-h-[90vh] bg-[#141514] border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl text-white flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+        <div className="flex items-center justify-between border-b border-white/10 px-4 sm:px-6 py-4 sm:py-5 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-luma-lime/10 border border-luma-lime/30 flex items-center justify-center text-luma-lime">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-luma-lime/10 border border-luma-lime/30 flex items-center justify-center text-luma-lime shrink-0">
               <Layers className="w-5 h-5 stroke-[2]" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold tracking-tight">Add Task to Timetable</h3>
+              <h3 className="text-base sm:text-lg font-semibold tracking-tight">Add Task to Timetable</h3>
               <p className="text-xs text-luma-text-muted flex items-center gap-1.5 mt-0.5">
                 <Calendar className="w-3 h-3 text-luma-lime" />
                 <span>{targetDateStr} {isToday ? '(Today)' : ''}</span>
@@ -208,13 +208,14 @@ export const AddTimelineTaskModal: React.FC<AddTimelineTaskModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-luma-text-muted hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-luma-text-muted hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="px-4 sm:px-6 py-4 overflow-y-auto space-y-5 flex-1">
           {/* Title Input */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-luma-text-muted uppercase tracking-wider">
@@ -320,18 +321,18 @@ export const AddTimelineTaskModal: React.FC<AddTimelineTaskModalProps> = ({
 
             {hasSpecificTime && (
               <div className="space-y-2 p-3.5 rounded-2xl bg-[#1b1d1b] border border-white/10">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                   <div className="flex items-center gap-2 flex-1">
                     <Clock className="w-4 h-4 text-luma-lime shrink-0" />
                     <input
                       type="time"
                       value={startTime}
                       onChange={(e) => setStartTime(e.target.value)}
-                      className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-luma-lime"
+                      className="w-full sm:w-auto bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-luma-lime"
                     />
                   </div>
                   {/* Quick pills */}
-                  <div className="flex items-center gap-1.5 text-xs font-mono">
+                  <div className="flex items-center gap-1.5 text-xs font-mono flex-wrap">
                     {isToday && (
                       <button
                         type="button"
@@ -420,9 +421,10 @@ export const AddTimelineTaskModal: React.FC<AddTimelineTaskModalProps> = ({
               ))}
             </div>
           </div>
+          </div>
 
-          {/* Submit Action */}
-          <div className="pt-3 flex items-center justify-end gap-3 border-t border-white/10">
+          {/* Submit Action Sticky Footer */}
+          <div className="px-4 sm:px-6 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] flex items-center justify-end gap-3 border-t border-white/10 bg-[#141514] shrink-0">
             <button
               type="button"
               onClick={onClose}
