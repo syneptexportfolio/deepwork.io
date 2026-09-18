@@ -103,6 +103,16 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
     return points.filter((p) => p.points > 0).length;
   }, [points]);
 
+  const currentMonthStr = useMemo(() => {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()).slice(0, 7);
+  }, []);
+
+  const currentMonthScore = useMemo(() => {
+    if (horizon !== 'yearly') return 0;
+    const pt = points.find((p) => p.date === currentMonthStr);
+    return pt ? pt.points : 0;
+  }, [horizon, points, currentMonthStr]);
+
   // SVG Dimensions
   const svgWidth = 540;
   const svgHeight = 210;
@@ -189,17 +199,23 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
           {/* Summary Metric Badges */}
           <div className="flex items-center gap-3 text-right">
             <div>
-              <div className="text-[10px] font-mono uppercase text-luma-text-dim">Total Scored</div>
+              <div className="text-[10px] font-mono uppercase text-luma-text-dim">
+                {horizon === 'yearly' ? 'This Month' : 'Total Scored'}
+              </div>
               <div className="text-base font-bold text-white font-mono">
-                {totalScored} <span className="text-xs font-normal text-luma-text-dim">{yUnitLabel}</span>
+                {horizon === 'yearly' ? currentMonthScore : totalScored} <span className="text-xs font-normal text-luma-text-dim">{yUnitLabel}</span>
               </div>
             </div>
             <div className="hidden sm:block border-l border-white/10 pl-3">
               <div className="text-[10px] font-mono uppercase text-luma-text-dim">
-                {horizon === 'yearly' ? 'Active Months' : 'Active Days'}
+                {horizon === 'yearly' ? 'Yearly Total' : 'Active Days'}
               </div>
               <div className={`text-base font-bold font-mono ${isLime ? 'text-luma-lime' : 'text-luma-purple'}`}>
-                {activeUnitsCount} <span className="text-xs font-normal text-luma-text-dim">{horizon === 'yearly' ? '/ 12m' : `/ ${points.length}d`}</span>
+                {horizon === 'yearly' ? (
+                  <>{totalScored} <span className="text-xs font-normal text-luma-text-dim">{yUnitLabel}</span></>
+                ) : (
+                  <>{activeUnitsCount} <span className="text-xs font-normal text-luma-text-dim">/ {points.length}d</span></>
+                )}
               </div>
             </div>
           </div>

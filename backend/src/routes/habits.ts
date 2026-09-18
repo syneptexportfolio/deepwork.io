@@ -166,9 +166,9 @@ habitsRouter.get('/yearly-points', async (c) => {
     const yearParam = c.req.query('year') || todayIST.slice(0, 4); // 'YYYY'
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    // Get completions grouped by month with active days
+    // Get completions grouped by month with active days (joined with habits to exclude deleted habits)
     const completionsRes = await c.env.DB.prepare(
-      'SELECT substr(date, 1, 7) as month_str, COUNT(*) as count, COUNT(DISTINCT date) as active_days FROM habit_completions WHERE date LIKE ? GROUP BY substr(date, 1, 7)'
+      'SELECT substr(hc.date, 1, 7) as month_str, COUNT(*) as count, COUNT(DISTINCT hc.date) as active_days FROM habit_completions hc INNER JOIN habits h ON hc.habit_id = h.id WHERE hc.date LIKE ? GROUP BY substr(hc.date, 1, 7)'
     ).bind(`${yearParam}-%`).all<{ month_str: string; count: number; active_days: number }>();
 
     const monthDataMap: Record<string, { count: number; active_days: number }> = {};
@@ -351,6 +351,7 @@ habitsRouter.post('/:id/check', async (c) => {
 habitsRouter.delete('/:id', async (c) => {
   try {
     const id = c.req.param('id');
+    await c.env.DB.prepare('DELETE FROM habit_completions WHERE habit_id = ?').bind(id).run();
     await c.env.DB.prepare('DELETE FROM habits WHERE id = ?').bind(id).run();
     await pruneOrResetSchedule(c.env.DB, getTodayIST());
     return c.json({ success: true, message: 'Habit deleted' });
