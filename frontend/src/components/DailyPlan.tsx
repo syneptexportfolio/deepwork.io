@@ -753,7 +753,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                 <span>
                   {activeDaySchedule.length > 0
                     ? 'Deeper cognitive work sits before coaching. Tactical reviews are scheduled during natural dips.'
-                    : 'Luma aligns focus with your circadian peak, protecting space for habit formation and rest.'}
+                    : 'Asst. JUGNU DAS aligns focus with your circadian peak, protecting space for habit formation and rest.'}
                 </span>
               </div>
             </div>

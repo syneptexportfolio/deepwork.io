@@ -78,12 +78,12 @@ export default {
 
   // Cloudflare Cron Trigger (Runs every 5 minutes)
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
-    console.log(`[Luma Cron Trigger] Fired at ${event.cron} (${new Date().toISOString()})`);
+    console.log(`[Cron Trigger] Fired at ${event.cron} (${new Date().toISOString()})`);
     ctx.waitUntil(
       checkAndSendReminders(env).then((summary) => {
-        console.log(`[Luma Cron Trigger] Reminders evaluated: ${summary.checked}, Sent: ${summary.sent}`);
+        console.log(`[Cron Trigger] Reminders evaluated: ${summary.checked}, Sent: ${summary.sent}`);
       }).catch((err) => {
-        console.error('[Luma Cron Trigger] Error running reminder job:', err);
+        console.error('[Cron Trigger] Error running reminder job:', err);
       })
     );
   }

@@ -33,7 +33,7 @@ const CATEGORY_CONFIGS: Record<GoalCategory, CategoryConfig> = {
     label: 'Project & Build',
     icon: Rocket,
     titleLabel: 'Project Name',
-    titlePlaceholder: 'e.g. Luma AI SaaS MVP, Portfolio Redesign, Mobile App V1',
+    titlePlaceholder: 'e.g. AI SaaS MVP, Portfolio Redesign, Mobile App V1',
     unitFieldLabel: 'Scope Metric',
     unitOptions: [
       { value: 'features', label: 'Features (e.g. Auth, Dashboard)' },

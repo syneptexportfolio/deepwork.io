@@ -134,7 +134,7 @@ export const App: React.FC = () => {
         setCachedJson('stats', statsRes.stats);
       }
     } catch (err) {
-      console.error('Failed to load Luma data:', err);
+      console.error('Failed to load app data:', err);
     }
   };
 

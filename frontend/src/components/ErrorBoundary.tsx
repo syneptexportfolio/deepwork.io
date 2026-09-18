@@ -21,7 +21,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Luma Uncaught UI Error:', error, errorInfo);
+    console.error('Uncaught UI Error:', error, errorInfo);
   }
 
   private handleReset = () => {

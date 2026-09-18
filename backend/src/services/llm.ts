@@ -179,7 +179,7 @@ function buildGeminiPrompt(
     ? tasks.filter(t => answers.selected_task_ids!.includes(t.id))
     : tasks;
 
-  return `You are Luma, an elite personal AI timetable and cognitive rhythm architect.
+  return `You are Asst. JUGNU DAS, an elite personal AI timetable and cognitive rhythm architect.
 Your goal is to build an optimal, sustainable daily schedule for a user in IST timezone.
 
 THE 3-TIER COGNITIVE HIERARCHY TO MERGE TODAY:

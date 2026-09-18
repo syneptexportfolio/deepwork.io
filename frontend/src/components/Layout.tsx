@@ -69,7 +69,7 @@ export const Layout: React.FC<LayoutProps> = ({
         <div>
           {/* Brand Logo */}
           <div className="flex items-center gap-2.5 mb-10 px-2 cursor-pointer" onClick={() => onSelectTab('overview')}>
-            <span className="font-serif text-2xl font-bold tracking-tight text-white">Luma</span>
+            <span className="font-serif text-2xl font-bold tracking-tight text-white">Asst. JUGNU DAS</span>
             <div className="w-4 h-4 rounded-full bg-[#1b2612] flex items-center justify-center border border-luma-lime/40">
               <div className="w-2 h-2 rounded-full bg-luma-lime shadow-[0_0_8px_#d4f938]"></div>
             </div>
@@ -125,7 +125,7 @@ export const Layout: React.FC<LayoutProps> = ({
               className="md:hidden flex items-center gap-1.5 cursor-pointer shrink-0"
               onClick={() => onSelectTab('overview')}
             >
-              <span className="font-serif text-lg xs:text-xl font-bold tracking-tight text-white">Luma</span>
+              <span className="font-serif text-lg xs:text-xl font-bold tracking-tight text-white">Asst. JUGNU DAS</span>
               <div className="w-2.5 h-2.5 rounded-full bg-luma-lime shadow-[0_0_6px_#d4f938]"></div>
             </div>
 

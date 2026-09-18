@@ -38,7 +38,7 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ onSuccess }) => {
       <div className="w-full max-w-sm bg-luma-card border border-luma-card-border rounded-3xl p-8 shadow-2xl text-center">
         {/* Luma Brand */}
         <div className="flex items-center justify-center gap-2 mb-6">
-          <span className="font-serif text-3xl font-bold tracking-tight text-white">Luma</span>
+          <span className="font-serif text-3xl font-bold tracking-tight text-white">Asst. JUGNU DAS</span>
           <div className="w-4 h-4 rounded-full bg-[#1b2612] flex items-center justify-center border border-luma-lime/40">
             <div className="w-2 h-2 rounded-full bg-luma-lime shadow-[0_0_8px_#d4f938]"></div>
           </div>
@@ -78,7 +78,7 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ onSuccess }) => {
             disabled={loading || !passcode}
             className="w-full flex items-center justify-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black py-3 rounded-2xl font-semibold text-xs shadow-lime-glow transition-all active:scale-[0.98] disabled:opacity-50"
           >
-            <span>{loading ? 'Verifying...' : 'Unlock Luma'}</span>
+            <span>{loading ? 'Verifying...' : 'Unlock'}</span>
             <ArrowRight className="w-4 h-4 stroke-[2.5]" />
           </button>
         </form>

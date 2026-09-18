@@ -379,11 +379,11 @@ export const LearningPaths: React.FC<LearningPathsProps> = ({
             </div>
           </div>
 
-          {/* Card 2: Luma's Recommendation */}
+          {/* Card 2: Asst. JUGNU DAS's Recommendation */}
           <div className="bg-luma-card border border-luma-card-border rounded-2xl xs:rounded-3xl p-4 xs:p-5 sm:p-6">
             <div className="text-[10px] font-mono tracking-widest uppercase text-luma-text-dim mb-3 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-luma-lime" />
-              <span>Luma's Recommendation</span>
+              <span>Asst. JUGNU DAS's Recommendation</span>
             </div>
             <p className="text-xs text-luma-text-muted leading-relaxed mb-4">
               {activeGoal.recommendation || (
