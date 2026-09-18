@@ -159,6 +159,51 @@ habitsRouter.get('/monthly-points', async (c) => {
   }
 });
 
+// GET /api/habits/yearly-points?year=YYYY
+habitsRouter.get('/yearly-points', async (c) => {
+  try {
+    const todayIST = getTodayIST();
+    const yearParam = c.req.query('year') || todayIST.slice(0, 4); // 'YYYY'
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Get completions grouped by month with active days
+    const completionsRes = await c.env.DB.prepare(
+      'SELECT substr(date, 1, 7) as month_str, COUNT(*) as count, COUNT(DISTINCT date) as active_days FROM habit_completions WHERE date LIKE ? GROUP BY substr(date, 1, 7)'
+    ).bind(`${yearParam}-%`).all<{ month_str: string; count: number; active_days: number }>();
+
+    const monthDataMap: Record<string, { count: number; active_days: number }> = {};
+    for (const row of (completionsRes.results || [])) {
+      monthDataMap[row.month_str] = {
+        count: Number(row.count),
+        active_days: Number(row.active_days),
+      };
+    }
+
+    const points = monthNames.map((label, idx) => {
+      const monthNum = idx + 1;
+      const monthStr = `${yearParam}-${String(monthNum).padStart(2, '0')}`;
+      const data = monthDataMap[monthStr] || { count: 0, active_days: 0 };
+      const daysInMonth = new Date(Number(yearParam), monthNum, 0).getDate();
+      return {
+        monthIndex: monthNum,
+        monthStr,
+        label,
+        points: data.count,
+        activeDays: data.active_days,
+        daysInMonth,
+      };
+    });
+
+    return c.json({
+      success: true,
+      year: yearParam,
+      points,
+    });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
+
 // GET /api/habits/heatmap?month=YYYY-MM
 habitsRouter.get('/heatmap', async (c) => {
   try {

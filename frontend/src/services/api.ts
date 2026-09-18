@@ -49,6 +49,17 @@ export function extractTimeFromText(text: string): string | null {
 export type HabitType = 'timed' | 'check_off' | 'target';
 export type FrequencyType = 'days' | 'interval' | 'weekly_target';
 
+export interface YearlyPointItem {
+  monthIndex: number;
+  monthStr: string;
+  label: string;
+  points: number;
+  totalTasks?: number;
+  activeDays: number;
+  daysInMonth: number;
+  percentage?: number;
+}
+
 export interface Habit {
   id: string;
   title: string;
@@ -304,6 +315,15 @@ export const api = {
     }>(`/api/habits/monthly-points${query}`);
   },
 
+  getYearlyHabitPoints: (year?: string) => {
+    const query = year ? `?year=${year}` : '';
+    return request<{
+      success: boolean;
+      year: string;
+      points: YearlyPointItem[];
+    }>(`/api/habits/yearly-points${query}`);
+  },
+
   copyPreviousHabits: () =>
     request<{ success: boolean; habits: Habit[]; count: number }>('/api/habits/copy-previous', {
       method: 'POST',
@@ -433,6 +453,15 @@ export const api = {
       month: string;
       points: { day: number; date: string; points: number; totalTasks: number; percentage: number }[];
     }>(`/api/schedule/monthly-task-points${query}`);
+  },
+
+  getYearlyTaskPoints: (year?: string) => {
+    const query = year ? `?year=${year}` : '';
+    return request<{
+      success: boolean;
+      year: string;
+      points: YearlyPointItem[];
+    }>(`/api/schedule/yearly-task-points${query}`);
   },
 
   // Stats

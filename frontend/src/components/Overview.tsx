@@ -40,12 +40,14 @@ interface OverviewProps {
 }
 
 interface PointItem {
-  day: number;
+  day?: number;
+  label?: string;
   date: string;
   points: number;
   maxPoints?: number;
   totalTasks?: number;
-  percentage: number;
+  percentage?: number;
+  activeDays?: number;
 }
 
 interface MonthlyPointsLineChartProps {
@@ -57,6 +59,8 @@ interface MonthlyPointsLineChartProps {
   maxY: number;
   yUnitLabel: string;
   isLoading?: boolean;
+  horizon?: 'monthly' | 'yearly';
+  onSelectNode?: (dateStr: string) => void;
 }
 
 function getSmoothSvgPath(coords: { x: number; y: number }[]): string {
@@ -86,6 +90,8 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
   maxY,
   yUnitLabel,
   isLoading = false,
+  horizon = 'monthly',
+  onSelectNode,
 }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
@@ -93,7 +99,7 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
     return points.reduce((sum, p) => sum + p.points, 0);
   }, [points]);
 
-  const activeDaysWithPoints = useMemo(() => {
+  const activeUnitsCount = useMemo(() => {
     return points.filter((p) => p.points > 0).length;
   }, [points]);
 
@@ -107,7 +113,12 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
   const graphW = svgWidth - paddingLeft - paddingRight;
   const graphH = svgHeight - paddingTop - paddingBottom;
 
-  const validMaxY = Math.max(maxY, 1);
+  const maxDataPoint = useMemo(() => {
+    if (points.length === 0) return 0;
+    return Math.max(...points.map((p) => p.points));
+  }, [points]);
+
+  const validMaxY = Math.max(maxY, maxDataPoint, 1);
 
   const coords = useMemo(() => {
     if (points.length === 0) return [];
@@ -128,16 +139,21 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
   const isLime = colorScheme === 'lime';
   const strokeColor = isLime ? '#d4f938' : '#a78bfa';
   const glowColor = isLime ? 'rgba(212,249,56,0.5)' : 'rgba(167,139,250,0.5)';
-  const gradientId = isLime ? 'limeGraphGradient' : 'purpleGraphGradient';
+  const gradientId = isLime
+    ? horizon === 'yearly' ? 'limeYearlyGradient' : 'limeGraphGradient'
+    : horizon === 'yearly' ? 'purpleYearlyGradient' : 'purpleGraphGradient';
   const badgeClasses = isLime
     ? 'text-luma-lime bg-luma-lime/10 border-luma-lime/20'
     : 'text-luma-purple bg-luma-purple/10 border-luma-purple/20';
 
   const hoveredItem = hoveredIndex !== null && coords[hoveredIndex] ? coords[hoveredIndex] : null;
 
-  // Key day ticks for X-axis
-  const dayTickIndices = useMemo(() => {
+  // Key ticks for X-axis
+  const tickIndices = useMemo(() => {
     if (points.length === 0) return [];
+    if (horizon === 'yearly') {
+      return Array.from({ length: points.length }, (_, i) => i);
+    }
     const ticks = [0];
     for (let d = 5; d < points.length; d += 5) {
       ticks.push(d - 1);
@@ -146,7 +162,7 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
       ticks.push(points.length - 1);
     }
     return ticks;
-  }, [points]);
+  }, [points, horizon]);
 
   return (
     <div className="bg-luma-card border border-luma-card-border rounded-3xl p-6 relative overflow-hidden shadow-md flex flex-col justify-between">
@@ -179,9 +195,11 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
               </div>
             </div>
             <div className="hidden sm:block border-l border-white/10 pl-3">
-              <div className="text-[10px] font-mono uppercase text-luma-text-dim">Active Days</div>
+              <div className="text-[10px] font-mono uppercase text-luma-text-dim">
+                {horizon === 'yearly' ? 'Active Months' : 'Active Days'}
+              </div>
               <div className={`text-base font-bold font-mono ${isLime ? 'text-luma-lime' : 'text-luma-purple'}`}>
-                {activeDaysWithPoints} <span className="text-xs font-normal text-luma-text-dim">/ {points.length}d</span>
+                {activeUnitsCount} <span className="text-xs font-normal text-luma-text-dim">{horizon === 'yearly' ? '/ 12m' : `/ ${points.length}d`}</span>
               </div>
             </div>
           </div>
@@ -190,12 +208,19 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
         {/* Hover Highlight Status Banner */}
         <div className="h-7 mb-2 flex items-center justify-between text-xs font-mono">
           {hoveredItem ? (
-            <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white animate-fadeIn">
+            <div
+              onClick={() => {
+                if (horizon === 'yearly' && onSelectNode) {
+                  onSelectNode(hoveredItem.point.date);
+                }
+              }}
+              className={`flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white animate-fadeIn flex-wrap ${
+                horizon === 'yearly' ? 'cursor-pointer hover:border-white/30' : ''
+              }`}
+            >
               <span className={isLime ? 'text-luma-lime font-bold' : 'text-luma-purple font-bold'}>
-                Day {hoveredItem.point.day}
+                {horizon === 'yearly' ? `${hoveredItem.point.label} (${hoveredItem.point.date})` : `Day ${hoveredItem.point.day}`}
               </span>
-              <span className="text-white/40">•</span>
-              <span className="text-luma-text-dim">{hoveredItem.point.date}</span>
               <span className="text-white/40">•</span>
               <span className="font-semibold text-white">
                 {hoveredItem.point.points} {yUnitLabel}
@@ -206,16 +231,35 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
                   <span className="text-luma-text-dim font-normal"> / {hoveredItem.point.totalTasks}</span>
                 )}
               </span>
-              <span className="text-emerald-400 font-bold">({hoveredItem.point.percentage}%)</span>
+              {hoveredItem.point.activeDays !== undefined && (
+                <>
+                  <span className="text-white/40">•</span>
+                  <span className="text-luma-text-dim">{hoveredItem.point.activeDays} active days</span>
+                </>
+              )}
+              {hoveredItem.point.percentage !== undefined && (
+                <span className="text-emerald-400 font-bold">({hoveredItem.point.percentage}%)</span>
+              )}
+              {horizon === 'yearly' && (
+                <span className="text-[10px] text-luma-lime bg-luma-lime/10 px-1.5 py-0.5 rounded border border-luma-lime/20 ml-1">
+                  View Month →
+                </span>
+              )}
             </div>
           ) : (
             <span className="text-[11px] text-luma-text-dim italic">
-              Hover over points along the curve to inspect daily scores
+              {horizon === 'yearly'
+                ? 'Hover or click months along the curve to inspect daily breakdown'
+                : 'Hover over points along the curve to inspect daily scores'}
             </span>
           )}
 
-          <div className="text-[10px] font-mono text-luma-text-dim">
-            Consistency: <span className="text-white font-medium">{points.length > 0 ? Math.round((activeDaysWithPoints / points.length) * 100) : 0}%</span>
+          <div className="text-[10px] font-mono text-luma-text-dim shrink-0">
+            {horizon === 'yearly' ? (
+              <>Active: <span className="text-white font-medium">{activeUnitsCount}/12m</span></>
+            ) : (
+              <>Consistency: <span className="text-white font-medium">{points.length > 0 ? Math.round((activeUnitsCount / points.length) * 100) : 0}%</span></>
+            )}
           </div>
         </div>
 
@@ -308,16 +352,21 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
                     key={c.index}
                     onMouseEnter={() => setHoveredIndex(c.index)}
                     onMouseLeave={() => setHoveredIndex(null)}
-                    className="cursor-pointer"
+                    onClick={() => {
+                      if (horizon === 'yearly' && onSelectNode) {
+                        onSelectNode(c.point.date);
+                      }
+                    }}
+                    className={horizon === 'yearly' ? 'cursor-pointer' : 'cursor-default'}
                   >
                     {/* Transparent larger hit target for smooth hover */}
-                    <circle cx={c.x} cy={c.y} r={10} fill="transparent" />
+                    <circle cx={c.x} cy={c.y} r={12} fill="transparent" />
 
                     {/* Visible point node */}
                     <circle
                       cx={c.x}
                       cy={c.y}
-                      r={isHovered ? 5.5 : hasScore ? 3.5 : 2}
+                      r={isHovered ? 5.5 : hasScore ? (horizon === 'yearly' ? 4 : 3.5) : 2}
                       fill={isHovered || hasScore ? strokeColor : '#252825'}
                       stroke={isHovered ? '#ffffff' : hasScore ? '#141514' : 'rgba(255,255,255,0.1)'}
                       strokeWidth={isHovered ? 2 : 1}
@@ -332,21 +381,22 @@ const MonthlyPointsLineChart: React.FC<MonthlyPointsLineChartProps> = ({
                 );
               })}
 
-              {/* X-Axis Days Labels */}
-              {dayTickIndices.map((idx) => {
+              {/* X-Axis Labels */}
+              {tickIndices.map((idx) => {
                 const c = coords[idx];
                 if (!c) return null;
+                const labelText = horizon === 'yearly' ? c.point.label : c.point.day;
                 return (
                   <text
                     key={idx}
                     x={c.x}
                     y={svgHeight - 10}
                     textAnchor="middle"
-                    fill="rgba(255,255,255,0.4)"
-                    fontSize="9"
+                    fill="rgba(255,255,255,0.45)"
+                    fontSize={horizon === 'yearly' ? "8.5" : "9"}
                     fontFamily="monospace"
                   >
-                    {c.point.day}
+                    {labelText}
                   </text>
                 );
               })}
@@ -470,6 +520,79 @@ export const Overview: React.FC<OverviewProps> = ({
     const [y, m] = selectedGraphMonth.split('-').map(Number);
     const d = new Date(y, m, 1);
     setSelectedGraphMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  // Performance Horizon: 'monthly' | 'yearly'
+  const [performanceHorizon, setPerformanceHorizon] = useState<'monthly' | 'yearly'>('monthly');
+
+  // Year Selector for Yearly Performance Curves
+  const [selectedGraphYear, setSelectedGraphYear] = useState<string>(() => {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()).slice(0, 4);
+  });
+
+  // Yearly Points Data State
+  const [yearlyHabitPointsData, setYearlyHabitPointsData] = useState<PointItem[]>([]);
+  const [yearlyTaskPointsData, setYearlyTaskPointsData] = useState<PointItem[]>([]);
+  const [loadingYearlyPoints, setLoadingYearlyPoints] = useState(false);
+
+  // Load Habit & Task Yearly Points
+  useEffect(() => {
+    if (performanceHorizon !== 'yearly') return;
+    let isMounted = true;
+    setLoadingYearlyPoints(true);
+    Promise.all([
+      api.getYearlyHabitPoints(selectedGraphYear).catch(() => null),
+      api.getYearlyTaskPoints(selectedGraphYear).catch(() => null),
+    ]).then(([habitRes, taskRes]) => {
+      if (!isMounted) return;
+      if (habitRes && habitRes.success) {
+        setYearlyHabitPointsData(
+          habitRes.points.map((p) => ({
+            label: p.label,
+            date: p.monthStr,
+            points: p.points,
+            activeDays: p.activeDays,
+            percentage: p.points > 0 ? Math.round((p.activeDays / p.daysInMonth) * 100) : 0,
+          }))
+        );
+      }
+      if (taskRes && taskRes.success) {
+        setYearlyTaskPointsData(
+          taskRes.points.map((p) => ({
+            label: p.label,
+            date: p.monthStr,
+            points: p.points,
+            totalTasks: p.totalTasks,
+            activeDays: p.activeDays,
+            percentage: p.percentage || 0,
+          }))
+        );
+      }
+      setLoadingYearlyPoints(false);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedGraphYear, performanceHorizon, habits, schedule]);
+
+  const handlePrevYear = () => {
+    const y = Number(selectedGraphYear) - 1;
+    setSelectedGraphYear(String(y));
+  };
+
+  const handleCurrentYear = () => {
+    const currentYear = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()).slice(0, 4);
+    setSelectedGraphYear(currentYear);
+  };
+
+  const handleNextYear = () => {
+    const y = Number(selectedGraphYear) + 1;
+    setSelectedGraphYear(String(y));
+  };
+
+  const handleDrillDownMonth = (monthStr: string) => {
+    setSelectedGraphMonth(monthStr);
+    setPerformanceHorizon('monthly');
   };
 
   // Load 7-Day Weekly Timetable
@@ -910,84 +1033,188 @@ export const Overview: React.FC<OverviewProps> = ({
         ) : null}
       </div>
 
-      {/* 4. DUAL SECTION: MONTHLY PERFORMANCE LINE GRAPHS (Habit Points & Timetable Task Points) */}
+      {/* 4. DUAL SECTION: MONTHLY & YEARLY PERFORMANCE LINE GRAPHS */}
       <div className="space-y-6">
-        {/* Section Header with Synchronized Month Navigator */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 bg-luma-card border border-luma-card-border rounded-3xl shadow-sm">
+        {/* Section Header with Horizon Switcher & Period Navigator */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-6 bg-luma-card border border-luma-card-border rounded-3xl shadow-sm">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="text-xs font-mono font-bold uppercase tracking-widest text-luma-lime">
-                Monthly Performance Curves
+                Performance Trajectory
               </span>
               <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-white/5 text-white border border-white/10">
-                {graphMonthLabel}
+                {performanceHorizon === 'monthly' ? graphMonthLabel : `${selectedGraphYear} Annual Horizon`}
               </span>
             </div>
             <h3 className="text-lg font-semibold text-white tracking-tight">
-              Habit & Timetable Task Points Progression
+              {performanceHorizon === 'monthly'
+                ? 'Habit & Timetable Task Points Progression'
+                : 'Annual 12-Month Habit & Timetable Growth Curves'}
             </h3>
             <p className="text-xs text-luma-text-muted mt-0.5">
-              Daily point accumulation trends across the 30/31-day monthly horizon.
+              {performanceHorizon === 'monthly'
+                ? 'Daily point accumulation trends across the 30/31-day monthly horizon.'
+                : 'Macro monthly comparison and annual pacing across all 12 months.'}
             </p>
           </div>
 
-          {/* Synchronized Month Navigation Controls */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5"
-              title="Previous month"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handleCurrentMonth}
-              className="px-3.5 py-2 rounded-xl text-xs font-mono bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5 font-medium"
-            >
-              This Month
-            </button>
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5"
-              title="Next month"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Horizon Switcher (Monthly vs Yearly) */}
+            <div className="flex items-center bg-[#151715] p-1 rounded-2xl border border-white/10 shadow-inner">
+              <button
+                type="button"
+                onClick={() => setPerformanceHorizon('monthly')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-mono transition-all cursor-pointer ${
+                  performanceHorizon === 'monthly'
+                    ? 'bg-luma-lime text-black font-bold shadow-lime-glow'
+                    : 'text-luma-text-muted hover:text-white'
+                }`}
+              >
+                📅 Monthly (30d)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPerformanceHorizon('yearly')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-mono transition-all cursor-pointer ${
+                  performanceHorizon === 'yearly'
+                    ? 'bg-luma-lime text-black font-bold shadow-lime-glow'
+                    : 'text-luma-text-muted hover:text-white'
+                }`}
+              >
+                🌍 Yearly (12m)
+              </button>
+            </div>
+
+            {/* Navigator Controls */}
+            {performanceHorizon === 'monthly' ? (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={handlePrevMonth}
+                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5"
+                  title="Previous month"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCurrentMonth}
+                  className="px-3.5 py-2 rounded-xl text-xs font-mono bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5 font-medium"
+                >
+                  This Month
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextMonth}
+                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5"
+                  title="Next month"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={handlePrevYear}
+                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5"
+                  title="Previous year"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCurrentYear}
+                  className="px-3.5 py-2 rounded-xl text-xs font-mono bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5 font-medium"
+                >
+                  This Year
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextYear}
+                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/5"
+                  title="Next year"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Dual Line Graphs Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Chart 1: Monthly Habit Points Line Graph */}
-          <MonthlyPointsLineChart
-            title="Monthly Habit Points Curve"
-            subtitle="1 point per completed habit daily"
-            badgeLabel="HABIT CADENCE"
-            colorScheme="lime"
-            points={habitPointsData?.points || []}
-            maxY={habitPointsData?.totalHabits ? Math.max(habitPointsData.totalHabits, 5) : 6}
-            yUnitLabel="pts"
-            isLoading={loadingPoints}
-          />
+          {performanceHorizon === 'monthly' ? (
+            <>
+              {/* Chart 1: Monthly Habit Points Line Graph */}
+              <MonthlyPointsLineChart
+                title="Monthly Habit Points Curve"
+                subtitle="1 point per completed habit daily"
+                badgeLabel="HABIT CADENCE"
+                colorScheme="lime"
+                horizon="monthly"
+                points={habitPointsData?.points || []}
+                maxY={habitPointsData?.totalHabits ? Math.max(habitPointsData.totalHabits, 5) : 6}
+                yUnitLabel="pts"
+                isLoading={loadingPoints}
+              />
 
-          {/* Chart 2: Monthly Timetable Task Points Line Graph */}
-          <MonthlyPointsLineChart
-            title="Monthly Timetable Task Points Curve"
-            subtitle="Points scored from completed timetable blocks"
-            badgeLabel="TIMELINE EXECUTION"
-            colorScheme="purple"
-            points={taskPointsData?.points || []}
-            maxY={
-              taskPointsData?.points?.length
-                ? Math.max(...taskPointsData.points.map((p) => p.points), 5)
-                : 6
-            }
-            yUnitLabel="tasks"
-            isLoading={loadingPoints}
-          />
+              {/* Chart 2: Monthly Timetable Task Points Line Graph */}
+              <MonthlyPointsLineChart
+                title="Monthly Timetable Task Points Curve"
+                subtitle="Points scored from completed timetable blocks"
+                badgeLabel="TIMELINE EXECUTION"
+                colorScheme="purple"
+                horizon="monthly"
+                points={taskPointsData?.points || []}
+                maxY={
+                  taskPointsData?.points?.length
+                    ? Math.max(...taskPointsData.points.map((p) => p.points), 5)
+                    : 6
+                }
+                yUnitLabel="tasks"
+                isLoading={loadingPoints}
+              />
+            </>
+          ) : (
+            <>
+              {/* Chart 1: Annual Habit Cadence Curve */}
+              <MonthlyPointsLineChart
+                title="Annual Habit Cadence Curve"
+                subtitle="Monthly habit completion volume across 12 months"
+                badgeLabel="ANNUAL CADENCE"
+                colorScheme="lime"
+                horizon="yearly"
+                points={yearlyHabitPointsData}
+                maxY={
+                  yearlyHabitPointsData.length
+                    ? Math.max(...yearlyHabitPointsData.map((p) => p.points), 10)
+                    : 10
+                }
+                yUnitLabel="pts"
+                isLoading={loadingYearlyPoints}
+                onSelectNode={handleDrillDownMonth}
+              />
+
+              {/* Chart 2: Annual Timetable Execution Curve */}
+              <MonthlyPointsLineChart
+                title="Annual Timetable Execution Curve"
+                subtitle="Monthly scheduled focus task output across 12 months"
+                badgeLabel="ANNUAL EXECUTION"
+                colorScheme="purple"
+                horizon="yearly"
+                points={yearlyTaskPointsData}
+                maxY={
+                  yearlyTaskPointsData.length
+                    ? Math.max(...yearlyTaskPointsData.map((p) => p.points), 10)
+                    : 10
+                }
+                yUnitLabel="tasks"
+                isLoading={loadingYearlyPoints}
+                onSelectNode={handleDrillDownMonth}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

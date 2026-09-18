@@ -600,4 +600,67 @@ scheduleRouter.get('/monthly-task-points', async (c) => {
   }
 });
 
+// GET /api/schedule/yearly-task-points?year=YYYY
+scheduleRouter.get('/yearly-task-points', async (c) => {
+  try {
+    const todayIST = getTodayIST();
+    const yearParam = c.req.query('year') || todayIST.slice(0, 4);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    const { results } = await c.env.DB.prepare(
+      'SELECT date, generated_plan FROM schedules WHERE date LIKE ?'
+    ).bind(`${yearParam}-%`).all<any>();
+
+    const map: Record<string, { completed: number; total: number; activeDays: Set<string> }> = {};
+    for (let m = 1; m <= 12; m++) {
+      const mStr = `${yearParam}-${String(m).padStart(2, '0')}`;
+      map[mStr] = { completed: 0, total: 0, activeDays: new Set() };
+    }
+
+    for (const row of (results || [])) {
+      const mStr = row.date.slice(0, 7);
+      if (!map[mStr]) {
+        map[mStr] = { completed: 0, total: 0, activeDays: new Set() };
+      }
+      try {
+        const blocks: ScheduleBlock[] = JSON.parse(row.generated_plan || '[]');
+        const activeBlocks = blocks.filter(b => b.type !== 'break');
+        const completed = activeBlocks.filter(b => b.status === 'done').length;
+        map[mStr].completed += completed;
+        map[mStr].total += activeBlocks.length;
+        if (completed > 0) {
+          map[mStr].activeDays.add(row.date);
+        }
+      } catch {
+        // ignore JSON errors
+      }
+    }
+
+    const points = monthNames.map((label, idx) => {
+      const monthNum = idx + 1;
+      const monthStr = `${yearParam}-${String(monthNum).padStart(2, '0')}`;
+      const data = map[monthStr] || { completed: 0, total: 0, activeDays: new Set() };
+      const daysInMonth = new Date(Number(yearParam), monthNum, 0).getDate();
+      return {
+        monthIndex: monthNum,
+        monthStr,
+        label,
+        points: data.completed,
+        totalTasks: data.total,
+        activeDays: data.activeDays.size,
+        daysInMonth,
+        percentage: data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0,
+      };
+    });
+
+    return c.json({
+      success: true,
+      year: yearParam,
+      points,
+    });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
+
 
