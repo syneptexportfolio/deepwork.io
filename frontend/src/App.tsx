@@ -465,6 +465,13 @@ export const App: React.FC = () => {
           }}
           onSelectTab={setCurrentTab}
           onUpdateWeeklyGoalProgress={handleUpdateWeeklyGoalProgress}
+          onTaskCreated={(newTask) => setTasks(prev => [newTask, ...prev])}
+          onScheduleUpdated={(newSchedule, dateStr) => {
+            const todayIST = getTodayISTStr();
+            if (dateStr === todayIST) {
+              setSchedule(newSchedule);
+            }
+          }}
         />
       )}
 

@@ -17,8 +17,9 @@ import {
   Plus,
   Minus,
 } from 'lucide-react';
-import { api, Habit, WeeklyGoal, ScheduleBlock, isTimeWithinBlock, Goal } from '../services/api';
+import { api, Habit, WeeklyGoal, ScheduleBlock, isTimeWithinBlock, Goal, Task } from '../services/api';
 import { getCategoryBadge } from './LearningPaths';
+import { AddTimelineTaskModal, insertAndReflowSchedule } from './modals/AddTimelineTaskModal';
 
 type DayCode = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
 
@@ -89,6 +90,8 @@ interface DailyPlanProps {
   onSelectTab?: (tab: any) => void;
   onUpdateWeeklyGoalProgress?: (id: string, newUnits: number) => Promise<void> | void;
   initialDateStr?: string;
+  onTaskCreated?: (task: Task) => void;
+  onScheduleUpdated?: (newSchedule: ScheduleBlock[], dateStr: string) => void;
 }
 
 export const DailyPlan: React.FC<DailyPlanProps> = ({
@@ -105,6 +108,8 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
   onSelectTab,
   onUpdateWeeklyGoalProgress,
   initialDateStr,
+  onTaskCreated,
+  onScheduleUpdated,
 }) => {
   const savedWorkHours = useMemo(() => {
     try {
@@ -125,6 +130,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
 
   type HorizonTab = 'anchors' | 'weekly' | 'long';
   const [activeHorizonTab, setActiveHorizonTab] = useState<HorizonTab>('anchors');
+  const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
 
   const activeHabits = useMemo(() => habits.filter(h => h.is_active), [habits]);
   const completedHabitsCount = useMemo(() => {
@@ -259,6 +265,81 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
     onToggleStatus(blockId, selectedDateStr);
   };
 
+  // Add task directly to timeline handler with intelligent reflow
+  const handleAddTaskToTimeline = async ({
+    title,
+    duration,
+    startTime,
+    category,
+    priority,
+    isUntimed,
+  }: {
+    title: string;
+    duration: number;
+    startTime?: string;
+    category: string;
+    priority: 'LOW' | 'MEDIUM' | 'HIGH';
+    isUntimed: boolean;
+  }) => {
+    const taskId = `task-${Date.now()}`;
+    const blockId = `block-${Date.now()}`;
+
+    const taskRecord: Partial<Task> = {
+      id: taskId,
+      title,
+      duration_minutes: isUntimed ? 0 : duration,
+      priority,
+      category,
+      energy_level: (startTime && startTime >= '17:00') || category === 'Personal & Social' ? 'light' : 'deep_focus',
+      status: 'pending',
+      scheduled_start: startTime || null,
+      column_bucket: 'now',
+    };
+
+    const updatedSchedule = insertAndReflowSchedule({
+      currentBlocks: activeDaySchedule,
+      newTask: {
+        title,
+        duration,
+        startTime,
+        category,
+        priority,
+        isUntimed,
+        taskId,
+        blockId,
+      },
+      workHours: savedWorkHours,
+      selectedDateStr,
+      isToday: isSelectedToday,
+      currentHHMM,
+    });
+
+    // 1. Optimistically update local scheduleMap
+    setScheduleMap(prev => ({
+      ...prev,
+      [selectedDateStr]: updatedSchedule,
+    }));
+
+    if (!activeDates.includes(selectedDateStr)) {
+      setActiveDates(prev => [...prev, selectedDateStr]);
+    }
+
+    // 2. Notify parent if today
+    if (isSelectedToday && onScheduleUpdated) {
+      onScheduleUpdated(updatedSchedule, selectedDateStr);
+    }
+
+    // 3. Persist to backend
+    try {
+      const res = await api.addCustomScheduleBlock(selectedDateStr, updatedSchedule, taskRecord);
+      if (res.task && onTaskCreated) {
+        onTaskCreated(res.task);
+      }
+    } catch (err) {
+      console.error('Failed to save task to schedule:', err);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-fadeIn">
       {/* Header */}
@@ -338,7 +419,19 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
             <h2 className="text-base font-semibold text-white tracking-tight">
               {sequenceTitle}
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Add Task Button: ONLY visible and active when activeDaySchedule.length > 0 and not isPastDate */}
+              {activeDaySchedule.length > 0 && !isPastDate && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddTaskModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-luma-lime text-black font-semibold text-xs shadow-lime-glow hover:bg-luma-lime-hover transition-all active:scale-95 cursor-pointer"
+                  title="Add task directly to timetable"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Add task</span>
+                </button>
+              )}
               {savedWorkHours?.workStartTime && savedWorkHours?.workEndTime && (
                 <button
                   type="button"
@@ -1042,6 +1135,18 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Add Task directly to Timetable Modal */}
+      <AddTimelineTaskModal
+        isOpen={isAddTaskModalOpen}
+        onClose={() => setIsAddTaskModalOpen(false)}
+        targetDateStr={selectedDateStr}
+        isToday={isSelectedToday}
+        currentHHMM={currentHHMM}
+        workHours={savedWorkHours}
+        existingBlocks={activeDaySchedule}
+        onAdd={handleAddTaskToTimeline}
+      />
     </div>
   );
 };

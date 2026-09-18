@@ -378,6 +378,89 @@ scheduleRouter.post('/generate', async (c) => {
   }
 });
 
+// POST /api/schedule/custom-block
+scheduleRouter.post('/custom-block', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { date, updatedSchedule, task } = body;
+    const targetDate = date && date.trim() !== '' ? date.trim() : getTodayIST();
+
+    if (!Array.isArray(updatedSchedule)) {
+      return c.json({ success: false, error: 'updatedSchedule must be an array of blocks' }, 400);
+    }
+
+    // 1. If task data is provided, persist it in the tasks table to protect it from pruning & support cross-view tracking
+    if (task && task.id && task.title) {
+      const existingTask = await c.env.DB.prepare('SELECT id FROM tasks WHERE id = ?').bind(task.id).first();
+      if (existingTask) {
+        await c.env.DB.prepare(`
+          UPDATE tasks SET
+            title = ?,
+            duration_minutes = ?,
+            priority = ?,
+            energy_level = ?,
+            status = ?,
+            scheduled_start = ?,
+            scheduled_end = ?,
+            category = ?,
+            task_date = ?
+          WHERE id = ?
+        `).bind(
+          task.title,
+          task.duration_minutes || 0,
+          task.priority || 'MEDIUM',
+          task.energy_level || 'deep_focus',
+          task.status || 'pending',
+          task.scheduled_start || null,
+          task.scheduled_end || null,
+          task.category || 'General',
+          targetDate,
+          task.id
+        ).run();
+      } else {
+        await c.env.DB.prepare(`
+          INSERT INTO tasks (id, title, type, duration_minutes, priority, energy_level, status, scheduled_start, scheduled_end, category, goal_id, column_bucket, task_date)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          task.id,
+          task.title,
+          'daily',
+          task.duration_minutes || 0,
+          task.priority || 'MEDIUM',
+          task.energy_level || 'deep_focus',
+          task.status || 'pending',
+          task.scheduled_start || null,
+          task.scheduled_end || null,
+          task.category || 'General',
+          null,
+          task.column_bucket || 'now',
+          targetDate
+        ).run();
+      }
+    }
+
+    // 2. Persist updated schedule plan strictly under targetDate
+    const scheduleId = `sched-${targetDate}`;
+    const planJson = JSON.stringify(updatedSchedule);
+
+    await c.env.DB.prepare(`
+      INSERT INTO schedules (id, date, generated_plan)
+      VALUES (?, ?, ?)
+      ON CONFLICT(date) DO UPDATE SET
+        generated_plan = excluded.generated_plan
+    `).bind(scheduleId, targetDate, planJson).run();
+
+    return c.json({
+      success: true,
+      date: targetDate,
+      schedule: updatedSchedule,
+      task: task || null
+    });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
+
 // PATCH /api/schedule/block/:blockId
 scheduleRouter.patch('/block/:blockId', async (c) => {
   try {

@@ -446,6 +446,12 @@ export const api = {
       body: JSON.stringify({ status, date }),
     }),
 
+  addCustomScheduleBlock: (date: string, updatedSchedule: ScheduleBlock[], task?: Partial<Task>) =>
+    request<{ success: boolean; date: string; schedule: ScheduleBlock[]; task?: Task }>('/api/schedule/custom-block', {
+      method: 'POST',
+      body: JSON.stringify({ date, updatedSchedule, task }),
+    }),
+
   getMonthlyTaskPoints: (month?: string) => {
     const query = month ? `?month=${month}` : '';
     return request<{
