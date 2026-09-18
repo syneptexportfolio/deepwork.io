@@ -51,6 +51,14 @@ export const App: React.FC = () => {
   // Auth / Gate
   const [isLocked, setIsLocked] = useState(false);
   const [maxCapacityHours, setMaxCapacityHours] = useState(32);
+  const [toastMessage, setToastMessage] = useState<{ text: string; type?: 'info' | 'error' | 'success' } | null>(null);
+
+  const showToast = (text: string, type: 'info' | 'error' | 'success' = 'info') => {
+    setToastMessage({ text, type });
+    setTimeout(() => {
+      setToastMessage(prev => (prev?.text === text ? null : prev));
+    }, 4000);
+  };
 
   const getTodayISTStr = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
@@ -181,7 +189,7 @@ export const App: React.FC = () => {
       setHabits(prev => prev.filter(h => h.id !== id));
       await loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to delete habit');
+      showToast(err.message || 'Failed to delete habit', 'error');
     }
   };
 
@@ -273,7 +281,7 @@ export const App: React.FC = () => {
       }
       await loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to add quick to-do');
+      showToast(err.message || 'Failed to add quick to-do', 'error');
     }
   };
 
@@ -319,7 +327,7 @@ export const App: React.FC = () => {
   const handleShapeMyDaySubmit = async (answers: QuestionnaireAnswers, targetDate?: string) => {
     const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
     if (targetDate && targetDate < todayIST) {
-      alert('Past days cannot be shaped. Please choose today or an upcoming day.');
+      showToast('Past days cannot be shaped. Please choose today or an upcoming day.', 'info');
       return;
     }
     await api.submitQuestionnaire(answers);
@@ -352,7 +360,7 @@ export const App: React.FC = () => {
       }
       await loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to save task');
+      showToast(err.message || 'Failed to save task', 'error');
     }
   };
 
@@ -362,7 +370,7 @@ export const App: React.FC = () => {
       setTasks(prev => prev.filter(t => t.id !== id));
       await loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to delete task');
+      showToast(err.message || 'Failed to delete task', 'error');
     }
   };
 
@@ -374,7 +382,7 @@ export const App: React.FC = () => {
       }
       await loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to create learning path');
+      showToast(err.message || 'Failed to create learning path', 'error');
     }
   };
 
@@ -390,7 +398,7 @@ export const App: React.FC = () => {
       });
       await loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to delete learning path');
+      showToast(err.message || 'Failed to delete learning path', 'error');
     }
   };
 
@@ -576,6 +584,21 @@ export const App: React.FC = () => {
         maxCapacity={maxCapacityHours}
         onUpdateCapacity={setMaxCapacityHours}
       />
+
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[#1d1f1d] border border-white/10 shadow-2xl text-white text-xs font-medium animate-fadeIn">
+          <span className={`w-2 h-2 rounded-full ${toastMessage.type === 'error' ? 'bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]' : toastMessage.type === 'success' ? 'bg-luma-lime shadow-[0_0_8px_rgba(212,249,56,0.5)]' : 'bg-luma-purple'}`} />
+          <span>{toastMessage.text}</span>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="ml-2 text-white/40 hover:text-white transition-colors cursor-pointer text-xs"
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </Layout>
   );
 };

@@ -1,6 +1,6 @@
 # Cloudflare Pages Redirects & Proxies
 # Proxy API calls to the Cloudflare Worker backend
-/api/*  https://deepwork-backend.workers.dev/api/:splat  200
+/api/*  https://deepwork-backend.syneptexportfolio.workers.dev/api/:splat  200
 
 # SPA Catch-all routing
 /*      /index.html                                     200

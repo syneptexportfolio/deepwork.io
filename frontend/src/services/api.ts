@@ -221,7 +221,14 @@ export interface StatsResponse {
 
 const PASSCODE_STORAGE_KEY = 'luma_passcode';
 
-const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const PRODUCTION_API_URL = 'https://deepwork-backend.syneptexportfolio.workers.dev';
+
+const API_BASE = (
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+    ? PRODUCTION_API_URL
+    : '')
+).replace(/\/$/, '');
 
 export function getStoredPasscode(): string {
   return localStorage.getItem(PASSCODE_STORAGE_KEY) || '';
