@@ -520,7 +520,7 @@ export function insertAndReflowSchedule({
     newBlock.end_time = newTask.isUntimed ? startStr : endStr;
 
     const updated = [...currentBlocks, newBlock];
-    return updated.sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
+    return sanitizeScheduleBreaks(updated);
   }
 
   // Case B: Specific Start Time
@@ -534,7 +534,7 @@ export function insertAndReflowSchedule({
   // Case 3: Time is outside the work window -> Add directly without rearranging
   if (!isInsideWorkWindow) {
     const updated = [...currentBlocks, newBlock];
-    return updated.sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
+    return sanitizeScheduleBreaks(updated);
   }
 
   // Check if it overlaps with any existing block
@@ -548,7 +548,7 @@ export function insertAndReflowSchedule({
   // Case 2: Time is within work window but does NOT overlap (fits into an open gap/outside current blocks)
   if (!hasOverlap) {
     const updated = [...currentBlocks, newBlock];
-    return updated.sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
+    return sanitizeScheduleBreaks(updated);
   }
 
   // Case 1: Time is within work window AND overlaps existing schedule -> REFLOW from roundoff time
@@ -565,7 +565,7 @@ export function insertAndReflowSchedule({
 
     if (b.status === 'done' || bEnd <= reflowAnchorMins) {
       lockedBlocks.push(b);
-    } else if (b.type === 'break' && b.category === 'Lunch') {
+    } else if (b.type === 'break' && (b.category === 'Lunch' || (b.title || '').toLowerCase().includes('lunch'))) {
       lockedBlocks.push(b);
     } else if (b.is_untimed || b.duration === 0) {
       lockedBlocks.push(b);
@@ -614,6 +614,47 @@ export function insertAndReflowSchedule({
   }
 
   const allUpdated = [...lockedBlocks, ...reflowedBlocks];
-  return allUpdated.sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
+  return sanitizeScheduleBreaks(allUpdated);
+}
+
+export function sanitizeScheduleBreaks(blocks: ScheduleBlock[]): ScheduleBlock[] {
+  if (!blocks || blocks.length === 0) return [];
+
+  const sorted = [...blocks].sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
+  const sanitized: ScheduleBlock[] = [];
+
+  for (const block of sorted) {
+    if (block.type === 'break') {
+      const prevBlock = sanitized.length > 0 ? sanitized[sanitized.length - 1] : null;
+      if (prevBlock && prevBlock.type === 'break') {
+        const isCurrentLunch = (block.title || '').toLowerCase().includes('lunch') ||
+                               (block.title || '').toLowerCase().includes('meal') ||
+                               block.category === 'Lunch';
+        const isPrevLunch = (prevBlock.title || '').toLowerCase().includes('lunch') ||
+                            (prevBlock.title || '').toLowerCase().includes('meal') ||
+                            prevBlock.category === 'Lunch';
+
+        if (isCurrentLunch && !isPrevLunch) {
+          // Replace preceding short recharge with protected lunch break
+          sanitized[sanitized.length - 1] = block;
+        } else if (!isCurrentLunch && isPrevLunch) {
+          // Discard redundant recharge since lunch already precedes it
+          continue;
+        } else {
+          // Both are recharge or both lunch: keep longer or first
+          if ((block.duration || 0) > (prevBlock.duration || 0)) {
+            sanitized[sanitized.length - 1] = block;
+          }
+          continue;
+        }
+      } else {
+        sanitized.push(block);
+      }
+    } else {
+      sanitized.push(block);
+    }
+  }
+
+  return sanitized;
 }
 

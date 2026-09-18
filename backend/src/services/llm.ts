@@ -104,11 +104,52 @@ export async function generateScheduleWithGemini(
     // Sort chronologically by start_time
     deduplicatedBlocks.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
 
-    return { blocks: deduplicatedBlocks, rawText: jsonText };
+    return { blocks: sanitizeScheduleBreaks(deduplicatedBlocks), rawText: jsonText };
   } catch (err: any) {
     console.error('Error invoking Gemini Flash API:', err);
     return { blocks: generateSmartFallbackSchedule(tasks, goals, answers, habits, weeklyGoals) };
   }
+}
+
+export function sanitizeScheduleBreaks(blocks: ScheduleBlock[]): ScheduleBlock[] {
+  if (!blocks || blocks.length === 0) return [];
+
+  const sorted = [...blocks].sort((a, b) => (a.start_time || '00:00').localeCompare(b.start_time || '00:00'));
+  const sanitized: ScheduleBlock[] = [];
+
+  for (const block of sorted) {
+    if (block.type === 'break') {
+      const prevBlock = sanitized.length > 0 ? sanitized[sanitized.length - 1] : null;
+      if (prevBlock && prevBlock.type === 'break') {
+        const isCurrentLunch = (block.title || '').toLowerCase().includes('lunch') ||
+                               (block.title || '').toLowerCase().includes('meal') ||
+                               block.category === 'Lunch';
+        const isPrevLunch = (prevBlock.title || '').toLowerCase().includes('lunch') ||
+                            (prevBlock.title || '').toLowerCase().includes('meal') ||
+                            prevBlock.category === 'Lunch';
+
+        if (isCurrentLunch && !isPrevLunch) {
+          // Replace preceding short recharge with protected lunch break
+          sanitized[sanitized.length - 1] = block;
+        } else if (!isCurrentLunch && isPrevLunch) {
+          // Discard redundant recharge since lunch already precedes it
+          continue;
+        } else {
+          // Both are recharge or both lunch: keep longer or first
+          if ((block.duration || 0) > (prevBlock.duration || 0)) {
+            sanitized[sanitized.length - 1] = block;
+          }
+          continue;
+        }
+      } else {
+        sanitized.push(block);
+      }
+    } else {
+      sanitized.push(block);
+    }
+  }
+
+  return sanitized;
 }
 
 function buildGeminiPrompt(
@@ -241,7 +282,7 @@ SCHEDULING RULES:
    - Ensure no two blocks overlap in time. Each block's start_time must be greater than or equal to the previous block's end_time.
    - Return blocks in ascending chronological sequence.
 9. UNTIMED TASKS: For untimed tasks (duration 0, meetings, calls, errands), schedule them with "is_untimed": true and "target_label": "⚡ Action item" or "🕒 HH:MM".
-10. RECHARGE BREAKS: Insert 10-15 minute "Step away & recharge" breaks between deep work sessions.
+10. RECHARGE BREAKS: Insert 10-15 minute "Step away & recharge" breaks between deep work sessions. CRITICAL: Breaks/rest periods CANNOT be scheduled one after another or consecutively. Every break MUST be preceded and followed by a work/focus session. Never place two breaks adjacent to each other.
 11. ASSIGN TASK IDs: For any block created from an existing task in the list, set "task_id" to that task's id; otherwise set null.
 12. TIME FORMAT: 24-hour "HH:MM".
 13. BLOCK SOURCE: One of: "habit", "long_term_goal", "daily_todo", "break".
@@ -585,6 +626,35 @@ export function generateSmartFallbackSchedule(
     }
   }
 
+  // F. Fill remaining open morning window before lunch with pending tasks
+  for (const at of afternoonTasks) {
+    if (scheduledTitles.has(at.title.toLowerCase().trim())) continue;
+    const isUntimed = at.duration_minutes === 0;
+    const dur = isUntimed ? 30 : at.duration_minutes;
+    if (currentMinutes + dur > morningCeiling || !canFit(dur)) break;
+
+    const s = formatTime(currentMinutes);
+    currentMinutes += dur;
+    const e = formatTime(currentMinutes);
+
+    blocks.push({
+      id: `block-${blocks.length + 1}`,
+      task_id: at.id,
+      title: at.title,
+      start_time: s,
+      end_time: e,
+      duration: dur,
+      type: at.energy_level || 'light',
+      block_source: 'daily_todo',
+      category: at.category || 'Focus Task',
+      status: 'pending',
+      reasoning: 'Productive execution block scheduled into open morning focus window.',
+      target_label: isUntimed ? '⚡ Action item' : undefined,
+      is_untimed: isUntimed
+    });
+    scheduledTitles.add(at.title.toLowerCase().trim());
+  }
+
   // --- MIDDAY LUNCH BREAK ---
   if (lunchDur > 0 && canFit(lunchDur)) {
     const lStart = Math.max(currentMinutes, lunchStartMin);
@@ -805,8 +875,11 @@ export function generateSmartFallbackSchedule(
   // Sort blocks by start_time so timetable flows strictly chronologically
   allBlocks.sort((a, b) => a.start_time.localeCompare(b.start_time));
 
+  // Sanitize to strictly eliminate consecutive breaks
+  const sanitizedBlocks = sanitizeScheduleBreaks(allBlocks);
+
   // Re-index IDs sequentially
-  return allBlocks.map((b, idx) => ({
+  return sanitizedBlocks.map((b, idx) => ({
     ...b,
     id: `block-${idx + 1}`
   }));

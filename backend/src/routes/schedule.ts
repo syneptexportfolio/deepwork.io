@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { Env, Goal, QuestionnaireAnswers, ScheduleBlock, Task } from '../types';
-import { generateScheduleWithGemini } from '../services/llm';
+import { generateScheduleWithGemini, sanitizeScheduleBreaks } from '../services/llm';
 
 export const scheduleRouter = new Hono<{ Bindings: Env }>();
 
@@ -67,18 +67,19 @@ export async function pruneOrResetSchedule(db: any, date: string): Promise<Sched
       return true;
     });
 
-    const nonBreakBlocks = filteredBlocks.filter(b => b.type !== 'break');
+    const sanitizedBlocks = sanitizeScheduleBreaks(filteredBlocks);
+    const nonBreakBlocks = sanitizedBlocks.filter(b => b.type !== 'break');
     if (nonBreakBlocks.length === 0) {
       await db.prepare('DELETE FROM schedules WHERE id = ?').bind(row.id).run();
       return [];
     }
 
-    if (filteredBlocks.length !== blocks.length) {
+    if (sanitizedBlocks.length !== blocks.length || JSON.stringify(sanitizedBlocks) !== row.generated_plan) {
       await db.prepare('UPDATE schedules SET generated_plan = ? WHERE id = ?')
-        .bind(JSON.stringify(filteredBlocks), row.id).run();
+        .bind(JSON.stringify(sanitizedBlocks), row.id).run();
     }
 
-    return filteredBlocks;
+    return sanitizedBlocks;
   } catch {
     return [];
   }
@@ -389,6 +390,8 @@ scheduleRouter.post('/custom-block', async (c) => {
       return c.json({ success: false, error: 'updatedSchedule must be an array of blocks' }, 400);
     }
 
+    const sanitizedSchedule = sanitizeScheduleBreaks(updatedSchedule);
+
     // 1. If task data is provided, persist it in the tasks table to protect it from pruning & support cross-view tracking
     if (task && task.id && task.title) {
       const existingTask = await c.env.DB.prepare('SELECT id FROM tasks WHERE id = ?').bind(task.id).first();
@@ -441,7 +444,7 @@ scheduleRouter.post('/custom-block', async (c) => {
 
     // 2. Persist updated schedule plan strictly under targetDate
     const scheduleId = `sched-${targetDate}`;
-    const planJson = JSON.stringify(updatedSchedule);
+    const planJson = JSON.stringify(sanitizedSchedule);
 
     await c.env.DB.prepare(`
       INSERT INTO schedules (id, date, generated_plan)
@@ -453,7 +456,7 @@ scheduleRouter.post('/custom-block', async (c) => {
     return c.json({
       success: true,
       date: targetDate,
-      schedule: updatedSchedule,
+      schedule: sanitizedSchedule,
       task: task || null
     });
   } catch (err: any) {
