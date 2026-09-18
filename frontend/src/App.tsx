@@ -217,21 +217,44 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleIncrementWeeklyGoal = async (id: string, currentCompleted: number) => {
+  const handleUpdateWeeklyGoalProgress = async (id: string, newUnits: number) => {
     const targetGoal = weeklyGoals.find(wg => wg.id === id);
-    if (targetGoal && currentCompleted >= targetGoal.target_units) {
-      return; // Already reached max target units
+    if (!targetGoal) return;
+
+    const clampedUnits = Math.max(0, Math.min(targetGoal.target_units, newUnits));
+    const wasAchieved = targetGoal.completed_units >= targetGoal.target_units;
+    const nowAchieved = clampedUnits >= targetGoal.target_units;
+
+    if (nowAchieved && !wasAchieved) {
+      confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
     }
-    const nextCompleted = targetGoal ? Math.min(targetGoal.target_units, currentCompleted + 1) : currentCompleted + 1;
-    confetti({ particleCount: 50, spread: 50, origin: { y: 0.6 } });
+
+    // Optimistic local update across all pages
+    setWeeklyGoals(prev => prev.map(wg => {
+      if (wg.id !== id) return wg;
+      const progressPercent = Math.min(100, Math.round((clampedUnits / Math.max(wg.target_units, 1)) * 100));
+      return {
+        ...wg,
+        completed_units: clampedUnits,
+        progressPercent,
+      };
+    }));
+
     try {
-      const res = await api.updateWeeklyGoal(id, { completed_units: nextCompleted });
+      const res = await api.updateWeeklyGoal(id, { completed_units: clampedUnits });
       if (res.weeklyGoal) {
         setWeeklyGoals(prev => prev.map(wg => wg.id === id ? res.weeklyGoal : wg));
       }
+      const statsRes = await api.getStats().catch(() => null);
+      if (statsRes?.stats) setStats(statsRes.stats);
     } catch (err) {
       console.error('Failed to update weekly goal progress:', err);
+      await loadData();
     }
+  };
+
+  const handleIncrementWeeklyGoal = async (id: string, currentCompleted: number) => {
+    await handleUpdateWeeklyGoalProgress(id, currentCompleted + 1);
   };
 
   const handleQuickAddTodo = async (title: string) => {
@@ -441,6 +464,7 @@ export const App: React.FC = () => {
             setCurrentTab('learning');
           }}
           onSelectTab={setCurrentTab}
+          onUpdateWeeklyGoalProgress={handleUpdateWeeklyGoalProgress}
         />
       )}
 
@@ -459,6 +483,7 @@ export const App: React.FC = () => {
           onDeleteWeeklyGoal={handleDeleteWeeklyGoal}
           onQuickAddTodo={handleQuickAddTodo}
           onIncrementWeeklyGoal={handleIncrementWeeklyGoal}
+          onUpdateWeeklyGoalProgress={handleUpdateWeeklyGoalProgress}
           onCopyPreviousHabits={handleCopyPreviousHabits}
           onCopyPreviousWeeklyGoals={handleCopyPreviousWeeklyGoals}
           onOpenShapeMyDay={() => setIsShapeMyDayOpen(true)}

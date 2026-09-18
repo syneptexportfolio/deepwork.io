@@ -14,6 +14,8 @@ import {
   Sun,
   Moon,
   Waves,
+  Plus,
+  Minus,
 } from 'lucide-react';
 import { api, Habit, WeeklyGoal, ScheduleBlock, isTimeWithinBlock, Goal } from '../services/api';
 import { getCategoryBadge } from './LearningPaths';
@@ -85,6 +87,7 @@ interface DailyPlanProps {
   onOpenShapeMyDay?: (targetDate?: string) => void;
   onSelectGoal?: (goalId: string) => void;
   onSelectTab?: (tab: any) => void;
+  onUpdateWeeklyGoalProgress?: (id: string, newUnits: number) => Promise<void> | void;
   initialDateStr?: string;
 }
 
@@ -100,6 +103,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
   onOpenShapeMyDay,
   onSelectGoal,
   onSelectTab,
+  onUpdateWeeklyGoalProgress,
   initialDateStr,
 }) => {
   const savedWorkHours = useMemo(() => {
@@ -841,14 +845,14 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                       return (
                         <div
                           key={wg.id}
-                          className="p-3.5 rounded-2xl bg-[#141514] border border-white/[0.04] hover:border-white/10 transition-all space-y-2"
+                          className="p-3.5 rounded-2xl bg-[#141514] border border-white/[0.04] hover:border-white/10 transition-all space-y-2.5 group/wg"
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-xs font-semibold text-white truncate">
                               {wg.title}
                             </span>
                             {isAchieved ? (
-                              <span className="text-[10px] font-mono font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/30 shrink-0">
+                              <span className="text-[10px] font-mono font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/30 shrink-0 flex items-center gap-1">
                                 ✓ Done
                               </span>
                             ) : (
@@ -870,11 +874,75 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                             />
                           </div>
 
-                          <div className="flex items-center justify-between text-[11px] font-mono text-luma-text-muted">
-                            <span>
-                              {wg.completed_units} / {wg.target_units} {wg.unit_label}
-                            </span>
-                            <span className={isAchieved ? 'text-emerald-400 font-semibold' : 'text-white/80'}>{progress}%</span>
+                          {/* Interactive Stepper & Progress Stats */}
+                          <div className="flex items-center justify-between text-[11px] font-mono pt-0.5">
+                            {/* Stepper Controls */}
+                            <div className="flex items-center gap-1 bg-[#1a1c1a] border border-white/[0.06] rounded-xl px-1.5 py-0.5">
+                              <button
+                                type="button"
+                                disabled={wg.completed_units <= 0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onUpdateWeeklyGoalProgress?.(wg.id, Math.max(0, wg.completed_units - 1));
+                                }}
+                                className="w-5 h-5 rounded-lg bg-white/5 hover:bg-white/15 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center text-white/70 hover:text-white transition-all text-xs active:scale-90"
+                                title="Decrease 1 unit"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+
+                              <button
+                                type="button"
+                                className="font-semibold text-white px-1.5 hover:text-luma-lime transition-colors cursor-pointer"
+                                title="Click to manually set completed units"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const val = prompt(`Set completed ${wg.unit_label || 'units'} (target: ${wg.target_units}):`, String(wg.completed_units));
+                                  if (val !== null) {
+                                    const parsed = parseInt(val.trim(), 10);
+                                    if (!isNaN(parsed)) {
+                                      onUpdateWeeklyGoalProgress?.(wg.id, Math.max(0, Math.min(wg.target_units, parsed)));
+                                    }
+                                  }
+                                }}
+                              >
+                                {wg.completed_units}
+                              </button>
+                              <span className="text-luma-text-dim text-[10px] pr-0.5">/ {wg.target_units} {wg.unit_label}</span>
+
+                              <button
+                                type="button"
+                                disabled={wg.completed_units >= wg.target_units}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onUpdateWeeklyGoalProgress?.(wg.id, Math.min(wg.target_units, wg.completed_units + 1));
+                                }}
+                                className="w-5 h-5 rounded-lg bg-luma-lime/15 hover:bg-luma-lime/25 text-luma-lime disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center transition-all text-xs font-bold active:scale-90 shadow-sm"
+                                title="Add 1 unit"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+
+                            {/* Percentage or Quick +1 Pill */}
+                            <div className="flex items-center gap-2">
+                              <span className={isAchieved ? 'text-emerald-400 font-semibold' : 'text-white/80'}>
+                                {progress}%
+                              </span>
+                              {!isAchieved && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onUpdateWeeklyGoalProgress?.(wg.id, Math.min(wg.target_units, wg.completed_units + 1));
+                                  }}
+                                  className="px-2 py-0.5 rounded-lg bg-luma-lime/10 hover:bg-luma-lime/20 text-luma-lime border border-luma-lime/25 text-[10px] font-bold transition-all hover:scale-105 active:scale-95 shadow-sm"
+                                  title={`Log +1 ${wg.unit_label || 'unit'}`}
+                                >
+                                  +1
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );

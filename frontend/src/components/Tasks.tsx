@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Flame, Sun, Waves, Moon, CheckCircle2, ArrowRight, Trash2, Pencil, RotateCcw, Target, Clock, Sparkles, Trophy, Calendar } from 'lucide-react';
+import { Plus, Minus, Flame, Sun, Waves, Moon, CheckCircle2, ArrowRight, Trash2, Pencil, RotateCcw, Target, Clock, Sparkles, Trophy, Calendar } from 'lucide-react';
 import { Habit, Task, WeeklyGoal } from '../services/api';
 
 import { normalizeHabitDays, WEEK_DAYS_CONFIG } from './modals/HabitModal';
@@ -20,6 +20,7 @@ interface TasksProps {
   onDeleteWeeklyGoal: (id: string) => Promise<void>;
   onQuickAddTodo: (title: string) => Promise<void>;
   onIncrementWeeklyGoal?: (id: string, currentCompleted: number) => Promise<void>;
+  onUpdateWeeklyGoalProgress?: (id: string, newUnits: number) => Promise<void> | void;
   onCopyPreviousHabits?: () => Promise<void>;
   onCopyPreviousWeeklyGoals?: () => Promise<void>;
   onOpenShapeMyDay?: () => void;
@@ -43,6 +44,7 @@ export const Tasks: React.FC<TasksProps> = ({
   onDeleteWeeklyGoal,
   onQuickAddTodo,
   onIncrementWeeklyGoal: _onIncrementWeeklyGoal,
+  onUpdateWeeklyGoalProgress,
   onCopyPreviousHabits,
   onCopyPreviousWeeklyGoals,
   onOpenShapeMyDay,
@@ -837,14 +839,69 @@ export const Tasks: React.FC<TasksProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {/* Stepper Controls */}
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1 bg-[#1a1c1a] border border-white/[0.08] rounded-xl px-2 py-0.5 shadow-sm"
+                      >
+                        <button
+                          type="button"
+                          disabled={wg.completed_units <= 0}
+                          onClick={() => {
+                            onUpdateWeeklyGoalProgress?.(wg.id, Math.max(0, wg.completed_units - 1));
+                          }}
+                          className="w-5 h-5 rounded-lg bg-white/5 hover:bg-white/15 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center text-white/70 hover:text-white transition-all text-xs active:scale-90"
+                          title="Decrease 1 unit"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+
+                        <span
+                          className="font-semibold text-white px-1.5 text-xs cursor-pointer hover:text-luma-lime transition-colors"
+                          title="Click to manually set completed units"
+                          onClick={() => {
+                            const val = prompt(`Set completed ${wg.unit_label || 'units'} (target: ${wg.target_units}):`, String(wg.completed_units));
+                            if (val !== null) {
+                              const parsed = parseInt(val.trim(), 10);
+                              if (!isNaN(parsed)) {
+                                onUpdateWeeklyGoalProgress?.(wg.id, Math.max(0, Math.min(wg.target_units, parsed)));
+                              }
+                            }
+                          }}
+                        >
+                          {wg.completed_units}
+                        </span>
+                        <span className="text-luma-text-dim text-[11px] pr-0.5">/ {wg.target_units} {wg.unit_label}</span>
+
+                        <button
+                          type="button"
+                          disabled={wg.completed_units >= wg.target_units}
+                          onClick={() => {
+                            onUpdateWeeklyGoalProgress?.(wg.id, Math.min(wg.target_units, wg.completed_units + 1));
+                          }}
+                          className="w-5 h-5 rounded-lg bg-luma-lime/15 hover:bg-luma-lime/25 text-luma-lime disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center transition-all text-xs font-bold active:scale-90 shadow-sm"
+                          title="Add 1 unit"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+
                       {isAchieved ? (
-                        <span className="text-xs font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-xl font-medium select-none">
+                        <span className="text-xs font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-xl font-medium select-none flex items-center gap-1">
                           ✓ Done
                         </span>
                       ) : (
-                        <span className="text-[11px] font-mono text-luma-text-dim/60 bg-white/[0.03] px-2.5 py-1 rounded-lg border border-white/5" title="Weekly goals progress is tracked via the Daily Plan timetable">
-                          Track in Daily Plan
-                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdateWeeklyGoalProgress?.(wg.id, Math.min(wg.target_units, wg.completed_units + 1));
+                          }}
+                          className="px-2.5 py-1 rounded-xl bg-luma-lime/10 hover:bg-luma-lime/20 text-luma-lime border border-luma-lime/25 text-xs font-bold font-mono transition-all hover:scale-105 active:scale-95 shadow-sm"
+                          title={`Log +1 ${wg.unit_label || 'unit'}`}
+                        >
+                          +1
+                        </button>
                       )}
 
                       <button
@@ -912,7 +969,11 @@ export const Tasks: React.FC<TasksProps> = ({
                   {/* Progress Bar */}
                   <div className="w-full h-2 bg-[#252825] rounded-full overflow-hidden my-3">
                     <div
-                      className="h-full bg-luma-lime shadow-[0_0_10px_rgba(212,249,56,0.4)] rounded-full transition-all duration-500"
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        isAchieved
+                          ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]'
+                          : 'bg-luma-lime shadow-[0_0_10px_rgba(212,249,56,0.4)]'
+                      }`}
                       style={{ width: `${progress}%` }}
                     />
                   </div>
