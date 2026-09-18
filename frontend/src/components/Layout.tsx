@@ -4,12 +4,11 @@ import {
   Calendar,
   CheckSquare,
   Compass,
-  BarChart2,
   Sparkles,
   Settings,
 } from 'lucide-react';
 
-export type NavTab = 'overview' | 'daily' | 'tasks' | 'learning' | 'patterns';
+export type NavTab = 'overview' | 'daily' | 'tasks' | 'learning';
 
 interface LayoutProps {
   currentTab: NavTab;
@@ -55,7 +54,6 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'daily' as NavTab, label: 'Daily plan', icon: Calendar },
     { id: 'tasks' as NavTab, label: 'Tasks', icon: CheckSquare },
     { id: 'learning' as NavTab, label: 'Projects & Goals', icon: Compass },
-    { id: 'patterns' as NavTab, label: 'Patterns', icon: BarChart2 },
   ];
 
   const capacityPercent = Math.min(100, Math.round((weeklyCapacityHours / maxCapacityHours) * 100));

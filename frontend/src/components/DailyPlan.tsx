@@ -15,7 +15,7 @@ import {
   Moon,
   Waves,
 } from 'lucide-react';
-import { api, Habit, WeeklyGoal, ScheduleBlock, isTimeWithinBlock, Goal, StatsResponse } from '../services/api';
+import { api, Habit, WeeklyGoal, ScheduleBlock, isTimeWithinBlock, Goal } from '../services/api';
 import { getCategoryBadge } from './LearningPaths';
 
 type DayCode = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
@@ -78,7 +78,6 @@ interface DailyPlanProps {
   habits?: Habit[];
   weeklyGoals?: WeeklyGoal[];
   goals?: Goal[];
-  stats?: StatsResponse | null;
   onToggleStatus: (id: string, dateStr?: string) => void;
   onToggleHabit?: (habitId: string) => void | Promise<void>;
   onStartFocus: (taskTitle: string, durationMinutes: number, blockId?: string) => void;
@@ -94,7 +93,6 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
   habits = [],
   weeklyGoals = [],
   goals = [],
-  stats = null,
   onToggleStatus,
   onToggleHabit,
   onStartFocus,
@@ -974,49 +972,6 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
               </div>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Bottom Card: Consistency is becoming a pattern -> navigates to Patterns */}
-      <div
-        onClick={() => {
-          if (onSelectTab) onSelectTab('patterns');
-        }}
-        className="bg-luma-card border border-luma-card-border hover:border-white/20 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 cursor-pointer transition-all group shadow-md"
-        title="Click to open Patterns & Analytics"
-      >
-        <div className="max-w-xl">
-          <h3 className="text-base font-semibold text-white tracking-tight mb-1 group-hover:text-luma-purple transition-colors">
-            Consistency is becoming a pattern →
-          </h3>
-          <p className="text-sm text-luma-text-muted leading-relaxed">
-            <span className="text-white font-medium">{stats?.weeklyRhythm?.rate || 0}% completion</span> across the past week. Your protected focus blocks are holding especially well.
-          </p>
-        </div>
-
-        {/* Mini 7-Day Bar Chart */}
-        <div className="flex items-end gap-3.5 pt-2">
-          {(stats?.weeklyPatternDays || [
-            { day: 'M', heightPercent: 0 },
-            { day: 'T', heightPercent: 0 },
-            { day: 'W', heightPercent: 0 },
-            { day: 'T', heightPercent: 0 },
-            { day: 'F', heightPercent: 0 },
-            { day: 'S', heightPercent: 0 },
-            { day: 'S', heightPercent: 0 },
-          ]).map((bar, i) => (
-            <div key={i} className="flex flex-col items-center gap-2">
-              <div className="w-4 h-16 bg-[#212421] rounded-t-sm flex items-end overflow-hidden">
-                <div
-                  className="w-full bg-luma-purple rounded-t-sm shadow-[0_0_8px_rgba(123,110,246,0.3)] transition-all duration-500 hover:brightness-125"
-                  style={{ height: `${bar.heightPercent}%` }}
-                />
-              </div>
-              <span className="text-[10px] font-mono text-luma-text-dim uppercase">
-                {bar.day}
-              </span>
-            </div>
-          ))}
         </div>
       </div>
     </div>

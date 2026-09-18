@@ -4,7 +4,6 @@ import { Overview } from './components/Overview';
 import { DailyPlan } from './components/DailyPlan';
 import { Tasks } from './components/Tasks';
 import { LearningPaths } from './components/LearningPaths';
-import { Patterns } from './components/Patterns';
 import { ShapeMyDayModal } from './components/modals/ShapeMyDayModal';
 import { TaskModal } from './components/modals/TaskModal';
 import { GoalModal } from './components/modals/GoalModal';
@@ -422,7 +421,6 @@ export const App: React.FC = () => {
           habits={habits}
           weeklyGoals={weeklyGoals}
           goals={goals}
-          stats={stats}
           initialDateStr={selectedDailyPlanDate}
           onToggleStatus={handleToggleScheduleStatus}
           onToggleHabit={handleCheckHabitStreak}
@@ -478,14 +476,6 @@ export const App: React.FC = () => {
           onStartFocus={(taskTitle, durationMinutes) =>
             setFocusSession({ isOpen: true, taskTitle, durationMinutes })
           }
-        />
-      )}
-
-      {currentTab === 'patterns' && (
-        <Patterns
-          stats={stats}
-          onSelectTab={setCurrentTab}
-          onOpenShapeMyDay={() => setIsShapeMyDayOpen(true)}
         />
       )}
 

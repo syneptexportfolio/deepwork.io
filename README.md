@@ -11,13 +11,12 @@ A single-user personal task & timetable assistant built on Cloudflare's free-tie
 
 ## Design System & Mockup Alignment
 
-The frontend is faithfully designed according to the 5 attached Luma mockups:
-1. **Overview**: Display headline `Make today count.`, metrics (`5h 30m`, `2/6`, `84%`), timeline sequence with connected nodes, long view goal progress bars, and 7-day pattern card.
-2. **Daily plan**: Interactive weekday strip (MON 08 – SUN 14), checklist sequence, `Physics, uninterrupted.` spotlight card with `Begin focus session`, and `Why this works` insight.
-3. **Tasks**: Filter pills (`All tasks`, `Today`, `Deep focus`, `Light work`), 3-column kanban (`NOW`, `UP NEXT`, `LATER`), task priority and duration badges.
-4. **Learning paths**: Donut progress ring (`62%`), syllabus topic list with status badges (`COVERED`, `DUE TODAY`, `NEXT UP`, `HIGH WEIGHT`, `UNTOUCHED`), exam runway milestones, and AI recommendations.
-5. **Patterns**: Matrix heatmap (`When focus lands`), morning vs afternoon split ratio, and 30-day spline curve.
-6. **Shape my day modal**: Questionnaire capturing available hours, wake/sleep time, energy level, top priority, and fixed commitments.
+The frontend is faithfully designed according to the core Luma design system:
+1. **Overview**: Executive pulse metrics, 7-day timetable matrix, and synchronized dual monthly performance curves (Habit Points & Timetable Task Points).
+2. **Daily plan**: Interactive weekday strip, chronologically sorted timetable sequence with timeline spine, hero spotlight card with focus timer, and unified Execution Horizons radar hub.
+3. **Tasks**: Streamlined Today's To-Dos, Monthly Habits, and Weekly Sprint Target Goals with compact filter rows and 1-click rollover.
+4. **Learning paths**: Donut progress ring, syllabus topic checklist (`COVERED`, `NEXT UP`), roadmap milestones, and curriculum navigation.
+5. **Shape my day modal**: AI timetable synthesis with core working hours (`09:00 - 17:00`), lunch break protection, and outside-work-hours commitment scheduling.
 
 ---
 
