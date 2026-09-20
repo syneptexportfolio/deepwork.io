@@ -158,6 +158,10 @@ export const App: React.FC = () => {
     setSchedule(prev => prev.map(s => s.id === scheduleId ? { ...s, status: newStatus } : s));
     if (block && block.task_id) {
       setTasks(prev => prev.map(t => t.id === block.task_id ? { ...t, status: newStatus } : t));
+    } else if (block && block.title) {
+      // Fallback: match by title if task_id was unassigned
+      const bTitle = block.title.toLowerCase().trim();
+      setTasks(prev => prev.map(t => t.title.toLowerCase().trim() === bTitle ? { ...t, status: newStatus } : t));
     }
 
     try {
@@ -170,6 +174,38 @@ export const App: React.FC = () => {
       }).catch(() => {});
     } catch (err) {
       console.error('Failed to toggle schedule block in backend:', err);
+    }
+  };
+
+  const handleToggleTaskStatus = async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const newStatus = task.status === 'done' ? 'pending' : 'done';
+
+    if (newStatus === 'done') {
+      confetti({ particleCount: 60, spread: 50, origin: { y: 0.7 } });
+    }
+
+    // 1. Optimistic task update
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+
+    // 2. Bidirectional sync with active schedule
+    const matchingBlock = schedule.find(s => s.task_id === taskId || s.title.toLowerCase().trim() === task.title.toLowerCase().trim());
+    if (matchingBlock && matchingBlock.status !== newStatus && !isBreakOrRestBlock(matchingBlock)) {
+      setSchedule(prev => prev.map(s => s.id === matchingBlock.id ? { ...s, status: newStatus } : s));
+      api.updateScheduleBlock(matchingBlock.id, newStatus).catch(() => {});
+    }
+
+    try {
+      await api.updateTask(taskId, { status: newStatus });
+      api.getStats().then(statsRes => {
+        if (statsRes?.stats) {
+          setStats(statsRes.stats);
+          setCachedJson('stats', statsRes.stats);
+        }
+      }).catch(() => {});
+    } catch (err) {
+      console.error('Failed to toggle task status in backend:', err);
     }
   };
 
@@ -538,6 +574,7 @@ export const App: React.FC = () => {
           habits={habits}
           weeklyGoals={weeklyGoals}
           goals={goals}
+          tasks={tasks}
           initialDateStr={selectedDailyPlanDate}
           onToggleStatus={handleToggleScheduleStatus}
           onToggleHabit={handleCheckHabitStreak}
@@ -576,6 +613,7 @@ export const App: React.FC = () => {
           weeklyGoals={weeklyGoals}
           onAddTask={() => { setEditingTask(null); setIsTaskModalOpen(true); }}
           onEditTask={(task) => { setEditingTask(task); setIsTaskModalOpen(true); }}
+          onToggleStatus={handleToggleTaskStatus}
           onAddHabit={() => { setEditingHabit(null); setIsHabitModalOpen(true); }}
           onEditHabit={(habit) => { setEditingHabit(habit); setIsHabitModalOpen(true); }}
           onDeleteHabit={handleDeleteHabit}

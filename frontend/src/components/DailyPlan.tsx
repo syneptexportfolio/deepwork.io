@@ -82,6 +82,7 @@ interface DailyPlanProps {
   habits?: Habit[];
   weeklyGoals?: WeeklyGoal[];
   goals?: Goal[];
+  tasks?: Task[];
   onToggleStatus: (id: string, dateStr?: string) => void;
   onToggleHabit?: (habitId: string) => void | Promise<void>;
   onStartFocus: (taskTitle: string, durationMinutes: number, blockId?: string) => void;
@@ -100,6 +101,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
   habits = [],
   weeklyGoals = [],
   goals = [],
+  tasks = [],
   onToggleStatus,
   onToggleHabit,
   onStartFocus,
@@ -257,6 +259,21 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
     : isPastDate
     ? `${fullDayNames[selectedDayCode]}'s sequence (Archived)`
     : `${fullDayNames[selectedDayCode]}'s sequence (Advance View)`;
+
+  // Identify any pending tasks for today that aren't on the timetable
+  const unscheduledTasks = useMemo(() => {
+    if (!isSelectedToday || !tasks || tasks.length === 0) return [];
+    return tasks.filter(t => {
+      if (t.status === 'done') return false;
+      const tNorm = (t.title || '').toLowerCase().trim();
+      const inSchedule = activeDaySchedule.some(b => {
+        if (b.task_id && b.task_id === t.id) return true;
+        const bNorm = (b.title || '').toLowerCase().trim();
+        return bNorm === tNorm || (bNorm.length > 3 && (bNorm.includes(tNorm) || tNorm.includes(bNorm)));
+      });
+      return !inSchedule;
+    });
+  }, [isSelectedToday, tasks, activeDaySchedule]);
 
   // Toggle schedule status handler
   const handleToggleBlock = (blockId: string) => {
@@ -629,6 +646,58 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                   </div>
                 );
               })}
+
+              {/* Unscheduled / Overflow To-Dos */}
+              {unscheduledTasks.length > 0 && (
+                <div className="mt-6 pt-5 border-t border-white/[0.08] relative">
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                      <h4 className="text-xs font-mono font-semibold uppercase tracking-wider text-amber-300">
+                        Unscheduled To-Dos ({unscheduledTasks.length})
+                      </h4>
+                    </div>
+                    <span className="text-[10px] font-mono text-luma-text-dim">
+                      From Today's Tasks
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {unscheduledTasks.map(t => (
+                      <div
+                        key={t.id}
+                        className="bg-[#181d16] border border-amber-500/25 hover:border-amber-500/50 rounded-xl p-3 flex items-center justify-between gap-2 transition-all"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-white truncate">
+                            {t.title}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5 text-[10px] font-mono text-luma-text-muted">
+                            <span>{t.duration_minutes > 0 ? `${t.duration_minutes}m` : 'Action'}</span>
+                            <span>•</span>
+                            <span className="text-amber-400/90">{t.priority}</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleAddTaskToTimeline({
+                              title: t.title,
+                              duration: t.duration_minutes || 30,
+                              category: t.category || 'General',
+                              priority: t.priority || 'MEDIUM',
+                              isUntimed: t.duration_minutes === 0,
+                            });
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-[11px] font-mono font-semibold flex items-center gap-1 transition-all shrink-0 cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Add</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : isPastDate ? (
             <div className="p-8 text-center rounded-2xl border border-dashed border-white/10 bg-[#161716]/60 flex flex-col items-center justify-center my-2">

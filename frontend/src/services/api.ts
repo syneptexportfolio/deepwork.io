@@ -218,9 +218,11 @@ export interface QuestionnaireAnswers {
   work_start_time?: string;
   work_end_time?: string;
   lunch_start_time?: string;
+  lunch_start_window?: string;
+  lunch_end_window?: string;
   lunch_duration_minutes?: number;
   energy_level: 'deep_focus' | 'light';
-  top_priority: string;
+  top_priority?: string;
   fixed_commitments?: string;
   focus_preference?: string;
   selected_habit_ids?: string[];

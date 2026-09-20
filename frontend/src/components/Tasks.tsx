@@ -34,7 +34,7 @@ export const Tasks: React.FC<TasksProps> = ({
   weeklyGoals,
   onAddTask,
   onEditTask,
-  onToggleStatus: _onToggleStatus,
+  onToggleStatus,
   onAddHabit,
   onEditHabit,
   onCheckHabitStreak: _onCheckHabitStreak,
@@ -122,19 +122,29 @@ export const Tasks: React.FC<TasksProps> = ({
         className={`bg-luma-card border border-luma-card-border hover:border-white/20 rounded-2xl p-4 transition-all hover:translate-y-[-1px] cursor-pointer relative border-l-4 ${accentBorder}`}
       >
         <div className="flex items-start justify-between gap-2 mb-1.5">
-          <h4 className={`text-sm font-semibold text-white leading-snug ${isDone ? 'line-through opacity-50' : ''}`}>
+          <h4 className={`text-sm font-semibold text-white leading-snug transition-all ${isDone ? 'line-through opacity-50' : ''}`}>
             {task.title}
           </h4>
-          {isDone ? (
-            <span className="text-[10px] font-mono font-semibold text-luma-lime bg-luma-lime/10 px-2 py-0.5 rounded-md border border-luma-lime/25 flex items-center gap-1 shrink-0">
-              <CheckCircle2 className="w-3 h-3" />
-              <span>Done</span>
-            </span>
-          ) : (
-            <span className="text-xs text-white/20 select-none shrink-0" title="Completed via Daily Plan schedule">
-              ○
-            </span>
-          )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleStatus?.(task.id);
+            }}
+            title={isDone ? 'Mark as pending' : 'Mark as done'}
+            className="group/btn p-0.5 rounded-md hover:bg-white/10 transition-colors shrink-0"
+          >
+            {isDone ? (
+              <span className="text-[10px] font-mono font-semibold text-luma-lime bg-luma-lime/10 px-2 py-0.5 rounded-md border border-luma-lime/25 flex items-center gap-1 shrink-0 group-hover/btn:brightness-125">
+                <CheckCircle2 className="w-3 h-3 text-luma-lime" />
+                <span>Done</span>
+              </span>
+            ) : (
+              <span className="w-5 h-5 rounded-full border border-white/20 hover:border-luma-lime hover:bg-luma-lime/10 flex items-center justify-center text-xs text-white/30 hover:text-luma-lime transition-all shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-transparent group-hover/btn:bg-luma-lime transition-colors" />
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="text-xs text-luma-text-muted mb-4">

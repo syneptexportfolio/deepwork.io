@@ -101,6 +101,21 @@ export async function generateScheduleWithGemini(
       deduplicatedBlocks.push(b);
     }
 
+    // Reconcile and validate task_id with actual tasks to prevent hallucinated ID mismatches
+    for (const b of deduplicatedBlocks) {
+      if (isBreakOrRestBlock(b)) continue;
+      const bTitle = (b.title || '').toLowerCase().trim();
+      const matchedTask = tasks.find(t => (t.title || '').toLowerCase().trim() === bTitle)
+        || tasks.find(t => {
+          const tNorm = (t.title || '').toLowerCase().trim();
+          return tNorm.length > 3 && (bTitle.includes(tNorm) || tNorm.includes(bTitle));
+        });
+      if (matchedTask) {
+        b.task_id = matchedTask.id;
+        b.block_source = 'daily_todo';
+      }
+    }
+
     // Sort chronologically by start_time
     deduplicatedBlocks.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
 
@@ -243,10 +258,8 @@ QUESTIONNAIRE RESPONSES:
 - Wake time: ${answers.wake_time}
 - Sleep time: ${answers.sleep_time}
 - Core Working Hours: ${answers.work_start_time || '09:00'} to ${answers.work_end_time || '17:00'}
-- Midday Lunch Break: ${answers.lunch_start_time ? `${answers.lunch_start_time} (${answers.lunch_duration_minutes || 45} mins)` : 'None'}
+- Protected Lunch Window: ${answers.lunch_duration_minutes && answers.lunch_duration_minutes > 0 ? `Between ${answers.lunch_start_window || answers.lunch_start_time || '12:30'} and ${answers.lunch_end_window || '14:00'} (${answers.lunch_duration_minutes} mins)` : 'None'}
 - Energy level: ${answers.energy_level}
-- Top priority for today: "${answers.top_priority}"
-- Fixed commitments: "${answers.fixed_commitments || 'None'}"
 - Style preference: "${answers.focus_preference || 'Deep work early, lighter review later'}"
 
 SCHEDULING RULES:
@@ -255,18 +268,24 @@ SCHEDULING RULES:
    - ALL flexible work tasks, long-term roadmap study goals, daytime habits, and work breaks MUST strictly conclude at or before ${answers.work_end_time || '17:00'}.
    - NEVER schedule flexible work blocks outside ${answers.work_start_time || '09:00'} to ${answers.work_end_time || '17:00'}.
 2. TIME-SPECIFIC COMMITMENTS & EVENTS (MANDATORY, INCLUDING OUTSIDE WORK HOURS):
-   - Any task with a scheduled_time (e.g. "20:00", meetings, appointments, calls, dinner, party at 8:00pm, evening events, early morning workouts) or mentioned in fixed commitments MUST be scheduled at that exact designated start time.
+   - Any task with a scheduled_time (e.g. "20:00", meetings, appointments, calls, dinner, party at 8:00pm, evening events, early morning workouts) MUST be scheduled at that exact designated start time.
    - CRITICAL: If a task has an explicit scheduled_time outside core working hours (e.g. "Party at 8:00pm" / 20:00, or a 07:00 workout), YOU MUST SCHEDULE IT on the daily timetable at that exact hour anywhere within the user's active waking day (${answers.wake_time} to ${answers.sleep_time}). Do NOT omit, discard, or clamp time-specific events into work hours!
    - Mark outside-work-hours evening social/personal events with category="Personal & Social" and appropriate reasoning.
 3. NO DUPLICATES: Every task, habit, and to-do must appear at most once in the timetable. Never schedule the same item twice.
-4. CHRONOLOGICAL TIME-OF-DAY BUCKET CONTRACT:
-   - MORNING WINDOW (${answers.work_start_time || '09:00'} → ${answers.lunch_start_time || '13:00'}):
-     - Reserved for tasks in the 'Morning' bucket, morning quick to-dos, and top priorities.
-     - Prime 60-75m morning focus block (e.g. 09:00-10:15) MUST be assigned to the user's top_priority or the highest-priority task from the 'Morning' bucket.
-   - MIDDAY LUNCH BREAK (${answers.lunch_start_time || '13:00'} for ${answers.lunch_duration_minutes || 45} mins):
+4. CHRONOLOGICAL TIME-OF-DAY BUCKET CONTRACT (BUCKET-STRICT PRIORITY):
+   - BUCKET INTEGRITY: Tasks in the 'Morning' bucket belong in the morning. Tasks in the 'Afternoon' bucket belong in the afternoon. Tasks in the 'Evening' bucket belong in the evening.
+   - NEVER schedule an 'Evening' bucket task in the morning or afternoon. NEVER pull afternoon/evening tasks forward into the morning.
+   - Inside each bucket, prioritize HIGH priority tasks before MEDIUM or LOW priority tasks.
+   - MORNING WINDOW (${answers.work_start_time || '09:00'} → Dynamic Lunch Start):
+     - Reserved STRICTLY for tasks in the 'Morning' bucket, morning quick to-dos, and morning roadmap study.
+     - The highest-priority (HIGH) task from the 'Morning' bucket gets the prime morning focus block (e.g. 09:00-10:15).
+   - DYNAMIC PROTECTED LUNCH WINDOW (${answers.lunch_start_window || answers.lunch_start_time || '12:30'} → ${answers.lunch_end_window || '14:00'}, duration: ${answers.lunch_duration_minutes || 45} mins):
      - Insert a protected "Lunch & recharge" break (block_source="break", category="Rest & Hydration").
-   - AFTERNOON WINDOW (Lunch End → Late Afternoon):
-     - Reserved for tasks in the 'Afternoon' bucket (calls, meetings, outreach, action items).
+     - DYNAMIC SLIDING: Lunch must NOT be rigidly forced to one minute. Instead, slide it dynamically within the window to start immediately after the last morning focus task concludes.
+     - Guardrail: Lunch MUST begin before or at latest start time so full duration completes by ${answers.lunch_end_window || '14:00'}.
+   - AFTERNOON WINDOW (Lunch Concludes → Late Afternoon):
+     - Reserved STRICTLY for tasks in the 'Afternoon' bucket (calls, meetings, outreach, action items) and afternoon roadmap study.
+     - HIGH priority afternoon tasks are scheduled first in the afternoon.
    - EVENING WINDOW (Late Afternoon → ${answers.work_end_time || '17:00'}, PLUS any fixed evening commitments at their exact time):
      - Work tasks in the 'Evening' bucket must wrap up before ${answers.work_end_time || '17:00'}.
      - Any fixed evening events (e.g. party, social dinner) are placed at their exact designated start time (e.g. 20:00).
@@ -283,7 +302,7 @@ SCHEDULING RULES:
    - Return blocks in ascending chronological sequence.
 9. UNTIMED TASKS: For untimed tasks (duration 0, meetings, calls, errands), schedule them with "is_untimed": true and "target_label": "⚡ Action item" or "🕒 HH:MM".
 10. RECHARGE BREAKS: Insert 10-15 minute "Step away & recharge" breaks between deep work sessions. CRITICAL: Breaks/rest periods CANNOT be scheduled one after another or consecutively. Every break MUST be preceded and followed by a work/focus session. Never place two breaks adjacent to each other.
-11. ASSIGN TASK IDs: For any block created from an existing task in the list, set "task_id" to that task's id; otherwise set null.
+11. ASSIGN TASK IDs: For any block created from an existing task in the list, you MUST set "task_id" to that exact task's id. NEVER assign task A's id to task B's title. If a block is not from a task, set null.
 12. TIME FORMAT: 24-hour "HH:MM".
 13. BLOCK SOURCE: One of: "habit", "long_term_goal", "daily_todo", "break".
 
@@ -358,8 +377,12 @@ export function generateSmartFallbackSchedule(
   const sleepMin = parseTime(answers.sleep_time, 23 * 60 + 30);
   const workStartMin = parseTime(answers.work_start_time || '09:00', 9 * 60);
   const workEndMin = parseTime(answers.work_end_time || '17:00', 17 * 60);
-  const lunchStartMin = answers.lunch_start_time ? parseTime(answers.lunch_start_time, 13 * 60) : 13 * 60;
   const lunchDur = answers.lunch_duration_minutes !== undefined ? answers.lunch_duration_minutes : 45;
+  const lunchStartWin = answers.lunch_start_window || answers.lunch_start_time || '12:30';
+  const lunchEndWin = answers.lunch_end_window || '14:00';
+  const lunchStartMin = parseTime(lunchStartWin, 12 * 60 + 30);
+  const lunchEndMin = parseTime(lunchEndWin, 14 * 60);
+  const latestLunchStartMin = Math.max(lunchStartMin, lunchEndMin - lunchDur);
 
   // 1. Filter active/selected items
   const activeHabits = answers.selected_habit_ids && answers.selected_habit_ids.length > 0
@@ -385,6 +408,22 @@ export function generateSmartFallbackSchedule(
   const morningTasks = unfixedTasks.filter(t => t.column_bucket === 'now');
   const afternoonTasks = unfixedTasks.filter(t => t.column_bucket === 'up_next');
   const eveningTasks = unfixedTasks.filter(t => t.column_bucket === 'later');
+
+  // Bucket-Strict Priority: Sort tasks within their time-of-day bucket (HIGH -> MEDIUM -> LOW, deep_focus -> light)
+  const sortTasksByPriority = (taskList: Task[]) => {
+    const pRank: Record<string, number> = { HIGH: 1, MEDIUM: 2, LOW: 3 };
+    return [...taskList].sort((a, b) => {
+      const diff = (pRank[a.priority || 'MEDIUM'] ?? 2) - (pRank[b.priority || 'MEDIUM'] ?? 2);
+      if (diff !== 0) return diff;
+      if (a.energy_level === 'deep_focus' && b.energy_level !== 'deep_focus') return -1;
+      if (b.energy_level === 'deep_focus' && a.energy_level !== 'deep_focus') return 1;
+      return 0;
+    });
+  };
+
+  const sortedMorningTasks = sortTasksByPriority(morningTasks);
+  const sortedAfternoonTasks = sortTasksByPriority(afternoonTasks);
+  const sortedEveningTasks = sortTasksByPriority(eveningTasks);
 
   // Prepare Long-Term Goals queue for flexible interleaving across the day
   const ltgQueue = activeLongTermGoals.map(ltg => {
@@ -486,39 +525,63 @@ export function generateSmartFallbackSchedule(
     scheduledTitles.add(morningTimedHabit.title.toLowerCase().trim());
   }
 
-  // B. Prime Morning Deep Focus Block (from morningTasks or top priority)
-  const primaryMorningTask = morningTasks.find(t => t.priority === 'HIGH' && !scheduledTitles.has(t.title.toLowerCase().trim()))
-    || morningTasks.find(t => !scheduledTitles.has(t.title.toLowerCase().trim()))
-    || (morningTasks.length === 0 ? unfixedTasks.find(t => t.priority === 'HIGH' && !scheduledTitles.has(t.title.toLowerCase().trim())) : null);
+  // B. Prime Morning Deep Focus Block (chosen STRICTLY from sortedMorningTasks or first Roadmap goal)
+  const chosenTask = sortedMorningTasks.find(t => !scheduledTitles.has(t.title.toLowerCase().trim()));
+  let primaryTitle: string;
+  let primaryTaskId: string | null = null;
+  let taskCategory = 'Morning Focus';
+  let taskEnergy: 'deep_focus' | 'light' = 'deep_focus';
 
-  const dur1 = answers.energy_level === 'light' ? 60 : 75;
+  if (chosenTask) {
+    primaryTitle = chosenTask.title;
+    primaryTaskId = chosenTask.id;
+    taskCategory = chosenTask.category || 'Morning Focus';
+    taskEnergy = chosenTask.energy_level || 'deep_focus';
+  } else if (ltgQueue.length > 0) {
+    const nextLtg = ltgQueue.shift()!;
+    primaryTitle = nextLtg.ltgTitle;
+    primaryTaskId = null;
+    taskCategory = nextLtg.ltg.category || 'Learning Path';
+    taskEnergy = nextLtg.energyType;
+  } else {
+    primaryTitle = 'Morning Focus & Planning';
+    primaryTaskId = null;
+  }
+
+  // Honor task configured duration if specified
+  const requestedDur = (chosenTask && chosenTask.duration_minutes > 0)
+    ? chosenTask.duration_minutes
+    : (answers.energy_level === 'light' ? 60 : 75);
+  // Cap at morning ceiling to ensure lunch window isn't violated
+  const availableMorning = Math.max(30, (lunchDur > 0 ? latestLunchStartMin : workEndMin) - currentMinutes - 15);
+  const dur1 = Math.min(requestedDur, Math.max(45, availableMorning));
+
   if (canFit(dur1)) {
     const s1 = formatTime(currentMinutes);
     currentMinutes += dur1;
     const e1 = formatTime(currentMinutes);
 
-    const primaryTitle = answers.top_priority && answers.top_priority.trim() !== '' && answers.top_priority !== 'Core daily priorities'
-      ? answers.top_priority.trim()
-      : (primaryMorningTask ? primaryMorningTask.title : 'Morning Deep Focus Sprint');
-
     blocks.push({
       id: `block-${blocks.length + 1}`,
-      task_id: primaryMorningTask?.id || null,
+      task_id: primaryTaskId,
       title: primaryTitle,
       start_time: s1,
       end_time: e1,
       duration: dur1,
-      type: 'deep_focus',
-      block_source: 'daily_todo',
-      category: primaryMorningTask?.category || 'Morning Focus',
+      type: taskEnergy,
+      block_source: chosenTask ? 'daily_todo' : (primaryTaskId ? 'daily_todo' : 'long_term_goal'),
+      category: taskCategory,
       status: 'pending',
-      reasoning: 'Prime morning cognitive peak allocated to main priority.'
+      reasoning: 'Prime morning cognitive peak allocated to highest priority morning task.'
     });
+
     scheduledTitles.add(primaryTitle.toLowerCase().trim());
-    if (primaryMorningTask) scheduledTitles.add(primaryMorningTask.title.toLowerCase().trim());
+    if (primaryTaskId && chosenTask) {
+      scheduledTitles.add(chosenTask.title.toLowerCase().trim());
+    }
 
     // Recharge Break
-    if (canFit(15)) {
+    if (canFit(15) && currentMinutes + 15 < lunchStartMin) {
       const bs1 = formatTime(currentMinutes);
       currentMinutes += 15;
       const be1 = formatTime(currentMinutes);
@@ -539,10 +602,10 @@ export function generateSmartFallbackSchedule(
   }
 
   // C. Interleave 1 Long-Term Goal in the Morning (if one exists and fits before lunch)
-  const morningCeiling = lunchDur > 0 ? lunchStartMin : workEndMin;
+  const morningCeiling = lunchDur > 0 ? latestLunchStartMin : workEndMin;
   if (ltgQueue.length > 0) {
     const nextLtg = ltgQueue[0];
-    if (currentMinutes + nextLtg.dur <= morningCeiling && canFit(nextLtg.dur)) {
+    if (currentMinutes + nextLtg.dur <= morningCeiling && currentMinutes < lunchStartMin && canFit(nextLtg.dur)) {
       ltgQueue.shift(); // Dequeue
       const s = formatTime(currentMinutes);
       currentMinutes += nextLtg.dur;
@@ -568,9 +631,11 @@ export function generateSmartFallbackSchedule(
     }
   }
 
-  // D. Remaining Morning Tasks before lunch
-  for (const t of morningTasks) {
+  // D. Remaining Morning Tasks strictly before lunch
+  for (const t of sortedMorningTasks) {
     if (scheduledTitles.has(t.title.toLowerCase().trim())) continue;
+    if (currentMinutes >= lunchStartMin) break; // Reached lunch window, break to start lunch!
+
     const isUntimed = t.duration_minutes === 0;
     const dur = isUntimed ? 25 : t.duration_minutes;
 
@@ -602,6 +667,8 @@ export function generateSmartFallbackSchedule(
   if (answers.morning_todos && answers.morning_todos.length > 0) {
     for (const td of answers.morning_todos) {
       if (!td.title || scheduledTitles.has(td.title.toLowerCase().trim())) continue;
+      if (currentMinutes >= lunchStartMin) break;
+
       const dur = td.duration_minutes || 20;
       if (currentMinutes + dur > morningCeiling || !canFit(dur)) break;
 
@@ -626,38 +693,12 @@ export function generateSmartFallbackSchedule(
     }
   }
 
-  // F. Fill remaining open morning window before lunch with pending tasks
-  for (const at of afternoonTasks) {
-    if (scheduledTitles.has(at.title.toLowerCase().trim())) continue;
-    const isUntimed = at.duration_minutes === 0;
-    const dur = isUntimed ? 30 : at.duration_minutes;
-    if (currentMinutes + dur > morningCeiling || !canFit(dur)) break;
-
-    const s = formatTime(currentMinutes);
-    currentMinutes += dur;
-    const e = formatTime(currentMinutes);
-
-    blocks.push({
-      id: `block-${blocks.length + 1}`,
-      task_id: at.id,
-      title: at.title,
-      start_time: s,
-      end_time: e,
-      duration: dur,
-      type: at.energy_level || 'light',
-      block_source: 'daily_todo',
-      category: at.category || 'Focus Task',
-      status: 'pending',
-      reasoning: 'Productive execution block scheduled into open morning focus window.',
-      target_label: isUntimed ? '⚡ Action item' : undefined,
-      is_untimed: isUntimed
-    });
-    scheduledTitles.add(at.title.toLowerCase().trim());
-  }
-
-  // --- MIDDAY LUNCH BREAK ---
+  // --- DYNAMIC PROTECTED LUNCH BREAK ---
   if (lunchDur > 0 && canFit(lunchDur)) {
-    const lStart = Math.max(currentMinutes, lunchStartMin);
+    // Dynamically slide lunch start time:
+    // If morning tasks finish before lunchStartMin, float start to lunchStartMin.
+    // If morning tasks finish within [lunchStartMin, latestLunchStartMin], start lunch immediately!
+    const lStart = Math.min(Math.max(currentMinutes, lunchStartMin), latestLunchStartMin);
     if (lStart + lunchDur <= workEndMin) {
       currentMinutes = lStart;
       const lEnd = currentMinutes + lunchDur;
@@ -672,18 +713,14 @@ export function generateSmartFallbackSchedule(
         block_source: 'break',
         category: 'Rest & Hydration',
         status: 'pending',
-        reasoning: 'Protected midday meal and cognitive recovery break.'
+        reasoning: `Protected midday recharge dynamically scheduled at ${formatTime(currentMinutes)} following morning tasks.`
       });
       currentMinutes = lEnd;
     }
   }
 
   // --- AFTERNOON PHASE ---
-  // Sort afternoon tasks by priority
-  const sortedAfternoonTasks = [...afternoonTasks].sort((a, b) => {
-    const pOrder: Record<string, number> = { HIGH: 1, MEDIUM: 2, LOW: 3 };
-    return (pOrder[a.priority || 'MEDIUM'] ?? 2) - (pOrder[b.priority || 'MEDIUM'] ?? 2);
-  });
+  // Schedule first afternoon task
 
   // Schedule first afternoon task
   if (sortedAfternoonTasks.length > 0) {
@@ -806,11 +843,6 @@ export function generateSmartFallbackSchedule(
   }
 
   // --- EVENING / WORKDAY WRAP-UP PHASE (Before workEndMin) ---
-  const sortedEveningTasks = [...eveningTasks].sort((a, b) => {
-    const pOrder: Record<string, number> = { HIGH: 1, MEDIUM: 2, LOW: 3 };
-    return (pOrder[a.priority || 'MEDIUM'] ?? 2) - (pOrder[b.priority || 'MEDIUM'] ?? 2);
-  });
-
   for (const et of sortedEveningTasks) {
     if (scheduledTitles.has(et.title.toLowerCase().trim())) continue;
 
@@ -839,6 +871,35 @@ export function generateSmartFallbackSchedule(
       is_untimed: isUntimed
     });
     scheduledTitles.add(et.title.toLowerCase().trim());
+  }
+
+  // --- RESIDUAL PASS: Schedule any remaining eligible tasks before workEndMin ---
+  for (const remainingTask of eligibleTasks) {
+    if (scheduledTitles.has(remainingTask.title.toLowerCase().trim())) continue;
+    const isUntimed = remainingTask.duration_minutes === 0;
+    const dur = isUntimed ? 25 : (remainingTask.duration_minutes > 0 ? remainingTask.duration_minutes : 30);
+    if (!canFit(dur)) break;
+
+    const s = formatTime(currentMinutes);
+    currentMinutes += dur;
+    const e = formatTime(currentMinutes);
+
+    blocks.push({
+      id: `block-${blocks.length + 1}`,
+      task_id: remainingTask.id,
+      title: remainingTask.title,
+      start_time: s,
+      end_time: e,
+      duration: dur,
+      type: remainingTask.energy_level || 'light',
+      block_source: 'daily_todo',
+      category: remainingTask.category || 'Focus Task',
+      status: 'pending',
+      reasoning: 'Productive task scheduled in available afternoon/evening focus window.',
+      target_label: isUntimed ? '⚡ Action item' : undefined,
+      is_untimed: isUntimed
+    });
+    scheduledTitles.add(remainingTask.title.toLowerCase().trim());
   }
 
   // Optional evening habit (shutdown ritual)

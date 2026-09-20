@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   X, Sparkles, Clock, Zap, Sun, Moon, Check, Plus, Trash2, 
-  Target, AlertCircle, CheckCircle2, Layers, Briefcase, Coffee, Compass,
+  AlertCircle, CheckCircle2, Layers, Briefcase, Coffee, Compass,
   BookOpen, Flame
 } from 'lucide-react';
 import { Habit, QuestionnaireAnswers, Task, WeeklyGoal, Goal, LongTermGoalDailyConfig, extractTimeFromText } from '../../services/api';
@@ -144,7 +144,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
   isOpen,
   targetDate,
   habits = [],
-  weeklyGoals = [],
+  weeklyGoals: _weeklyGoals = [],
   tasks = [],
   goals = [],
   onClose,
@@ -165,14 +165,12 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
   const [workStartTime, setWorkStartTime] = useState('09:00');
   const [workEndTime, setWorkEndTime] = useState('17:00');
   const [hasLunchBreak, setHasLunchBreak] = useState(true);
-  const [lunchStartTime, setLunchStartTime] = useState('13:00');
+  const [lunchStartWindow, setLunchStartWindow] = useState('12:30');
+  const [lunchEndWindow, setLunchEndWindow] = useState('14:00');
   const [lunchDuration, setLunchDuration] = useState(45);
+  const [selectedLunchPreset, setSelectedLunchPreset] = useState<string>('standard');
   const [selectedPreset, setSelectedPreset] = useState<string>('9-5');
   const [energy, setEnergy] = useState<'deep_focus' | 'light'>('deep_focus');
-
-  // Section 2: Priority & Commitments
-  const [priority, setPriority] = useState('');
-  const [commitments, setCommitments] = useState('');
   const [preference, setPreference] = useState('Deep focus in morning, lighter review in afternoon');
 
   // Section 3: Selections
@@ -218,26 +216,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
       }
       setGoalConfigs(prev => ({ ...initialConfigs, ...prev }));
 
-      // 4. Intelligent default for priority (first high-priority pending task or weekly goal)
-      if (!priority) {
-        const topTask = pendingTasks.find(t => t.priority === 'HIGH') || pendingTasks[0];
-        const topGoal = weeklyGoals.find(g => g.priority === 'HIGH') || weeklyGoals[0];
-        const topLongTerm = goals[0];
-        if (topTask) {
-          setPriority(topTask.title);
-        } else if (topGoal) {
-          setPriority(topGoal.title);
-        } else if (topLongTerm) {
-          setPriority(topLongTerm.title);
-        }
-      }
-
-      // 5. Intelligent default for fixed commitments if detected anchors exist
-      if (!commitments && detectedAnchors.length > 0) {
-        setCommitments(detectedAnchors.map(a => `${a.title} at ${a.scheduled_start || extractTimeFromText(a.title)}`).join(', '));
-      }
-
-      // 6. Load saved work hours preference if available
+      // 4. Load saved work hours preference if available
       try {
         const saved = localStorage.getItem('luma_default_work_hours');
         if (saved) {
@@ -245,9 +224,12 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
           if (parsed.workStartTime) setWorkStartTime(parsed.workStartTime);
           if (parsed.workEndTime) setWorkEndTime(parsed.workEndTime);
           if (parsed.hasLunchBreak !== undefined) setHasLunchBreak(parsed.hasLunchBreak);
-          if (parsed.lunchStartTime) setLunchStartTime(parsed.lunchStartTime);
+          if (parsed.lunchStartWindow) setLunchStartWindow(parsed.lunchStartWindow);
+          else if (parsed.lunchStartTime) setLunchStartWindow(parsed.lunchStartTime);
+          if (parsed.lunchEndWindow) setLunchEndWindow(parsed.lunchEndWindow);
           if (parsed.lunchDuration) setLunchDuration(parsed.lunchDuration);
           if (parsed.selectedPreset) setSelectedPreset(parsed.selectedPreset);
+          if (parsed.selectedLunchPreset) setSelectedLunchPreset(parsed.selectedLunchPreset);
         }
       } catch {}
     }
@@ -366,9 +348,11 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
         workStartTime,
         workEndTime,
         hasLunchBreak,
-        lunchStartTime,
+        lunchStartWindow,
+        lunchEndWindow,
         lunchDuration,
         selectedPreset,
+        selectedLunchPreset,
       }));
 
       const longTermConfigsPayload: LongTermGoalDailyConfig[] = selectedLongTermGoalIds.map(id => {
@@ -390,11 +374,13 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
         sleep_time: sleepTime,
         work_start_time: workStartTime,
         work_end_time: workEndTime,
-        lunch_start_time: hasLunchBreak ? lunchStartTime : undefined,
+        lunch_start_time: hasLunchBreak ? lunchStartWindow : undefined,
+        lunch_start_window: hasLunchBreak ? lunchStartWindow : undefined,
+        lunch_end_window: hasLunchBreak ? lunchEndWindow : undefined,
         lunch_duration_minutes: hasLunchBreak ? lunchDuration : 0,
         energy_level: energy,
-        top_priority: priority.trim() || 'Core daily priorities',
-        fixed_commitments: commitments.trim() || undefined,
+        top_priority: undefined,
+        fixed_commitments: undefined,
         focus_preference: preference.trim() || undefined,
         selected_task_ids: selectedTaskIds,
         selected_habit_ids: selectedHabitIds,
@@ -540,10 +526,10 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                 {/* Quick Presets */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
-                    { id: '9-5', label: '9:00 - 17:00', name: 'Standard', start: '09:00', end: '17:00', lunch: '13:00' },
-                    { id: 'full_day', label: '9:30 - 18:30', name: 'Full Day', start: '09:30', end: '18:30', lunch: '13:30' },
-                    { id: 'early', label: '8:00 - 16:00', name: 'Early Bird', start: '08:00', end: '16:00', lunch: '12:30' },
-                    { id: 'late', label: '11:00 - 20:00', name: 'Flexible', start: '11:00', end: '20:00', lunch: '14:30' },
+                    { id: '9-5', label: '9:00 - 17:00', name: 'Standard', start: '09:00', end: '17:00', lunchStart: '12:30', lunchEnd: '14:00' },
+                    { id: 'full_day', label: '9:30 - 18:30', name: 'Full Day', start: '09:30', end: '18:30', lunchStart: '13:00', lunchEnd: '14:30' },
+                    { id: 'early', label: '8:00 - 16:00', name: 'Early Bird', start: '08:00', end: '16:00', lunchStart: '12:00', lunchEnd: '13:30' },
+                    { id: 'late', label: '11:00 - 20:00', name: 'Flexible', start: '11:00', end: '20:00', lunchStart: '14:00', lunchEnd: '15:30' },
                   ].map((p) => {
                     const isSelected = selectedPreset === p.id;
                     return (
@@ -554,7 +540,8 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                           setSelectedPreset(p.id);
                           setWorkStartTime(p.start);
                           setWorkEndTime(p.end);
-                          setLunchStartTime(p.lunch);
+                          setLunchStartWindow(p.lunchStart);
+                          setLunchEndWindow(p.lunchEnd);
                         }}
                         className={`px-3 py-2 rounded-xl border text-left transition-all ${
                           isSelected
@@ -601,8 +588,8 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                   </div>
                 </div>
 
-                {/* Midday Lunch / Recharge Break */}
-                <div className="p-3 rounded-xl bg-[#141514] border border-white/[0.04] space-y-2.5">
+                {/* Midday Lunch / Protected Dynamic Lunch Window */}
+                <div className="p-3.5 rounded-xl bg-[#141514] border border-white/[0.06] space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 cursor-pointer text-xs text-white">
                       <input
@@ -612,42 +599,101 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                         className="rounded border-luma-card-border accent-luma-lime w-3.5 h-3.5"
                       />
                       <Coffee className="w-3.5 h-3.5 text-amber-400" />
-                      <span className="font-medium text-xs">Protected Lunch & Midday Recharge</span>
+                      <span className="font-semibold text-xs text-white">Protected Lunch Window (Dynamic Placement)</span>
                     </label>
                     {hasLunchBreak && (
-                      <span className="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/20">
-                        {lunchDuration}m break
+                      <span className="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-md border border-amber-400/20 font-medium">
+                        {lunchDuration}m break • {lunchStartWindow} → {lunchEndWindow}
                       </span>
                     )}
                   </div>
 
                   {hasLunchBreak && (
-                    <div className="grid grid-cols-2 gap-3 pt-1">
-                      <div>
-                        <span className="text-[10px] font-mono text-luma-text-dim block mb-1">
-                          Lunch Start Time
-                        </span>
-                        <input
-                          type="time"
-                          value={lunchStartTime}
-                          onChange={(e) => setLunchStartTime(e.target.value)}
-                          className="w-full bg-[#1b1d1b] border border-luma-card-border rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-luma-lime"
-                        />
+                    <div className="space-y-2.5 pt-1">
+                      {/* Window Presets */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                        {[
+                          { id: 'standard', label: '12:30 - 14:00', name: 'Standard', start: '12:30', end: '14:00' },
+                          { id: 'early', label: '12:00 - 13:30', name: 'Early', start: '12:00', end: '13:30' },
+                          { id: 'late', label: '13:00 - 14:30', name: 'Late', start: '13:00', end: '14:30' },
+                          { id: 'custom', label: 'Custom Range', name: 'Custom', start: lunchStartWindow, end: lunchEndWindow },
+                        ].map((lp) => {
+                          const isSel = selectedLunchPreset === lp.id;
+                          return (
+                            <button
+                              key={lp.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedLunchPreset(lp.id);
+                                if (lp.id !== 'custom') {
+                                  setLunchStartWindow(lp.start);
+                                  setLunchEndWindow(lp.end);
+                                }
+                              }}
+                              className={`px-2.5 py-1.5 rounded-lg border text-left transition-all ${
+                                isSel
+                                  ? 'bg-[#292218] border-amber-500/50 text-white'
+                                  : 'bg-[#181a18] border-white/[0.04] text-luma-text-muted hover:border-white/20'
+                              }`}
+                            >
+                              <div className="text-[10px] font-medium text-white">{lp.name}</div>
+                              <div className="text-[9px] font-mono text-amber-400/90">{lp.label}</div>
+                            </button>
+                          );
+                        })}
                       </div>
-                      <div>
-                        <span className="text-[10px] font-mono text-luma-text-dim block mb-1">
-                          Break Duration
-                        </span>
-                        <select
-                          value={lunchDuration}
-                          onChange={(e) => setLunchDuration(Number(e.target.value))}
-                          className="w-full bg-[#1b1d1b] border border-luma-card-border rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-luma-lime"
-                        >
-                          <option value={30}>30 minutes</option>
-                          <option value={45}>45 minutes</option>
-                          <option value={60}>60 minutes (1 hr)</option>
-                        </select>
+
+                      {/* Window Time Pickers & Duration */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                        <div>
+                          <span className="text-[10px] font-mono text-luma-text-dim block mb-1">
+                            Earliest Start
+                          </span>
+                          <input
+                            type="time"
+                            value={lunchStartWindow}
+                            onChange={(e) => {
+                              setLunchStartWindow(e.target.value);
+                              setSelectedLunchPreset('custom');
+                            }}
+                            className="w-full bg-[#1b1d1b] border border-luma-card-border rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-luma-lime"
+                          />
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] font-mono text-luma-text-dim block mb-1">
+                            Latest Finish
+                          </span>
+                          <input
+                            type="time"
+                            value={lunchEndWindow}
+                            onChange={(e) => {
+                              setLunchEndWindow(e.target.value);
+                              setSelectedLunchPreset('custom');
+                            }}
+                            className="w-full bg-[#1b1d1b] border border-luma-card-border rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-luma-lime"
+                          />
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] font-mono text-luma-text-dim block mb-1">
+                            Break Duration
+                          </span>
+                          <select
+                            value={lunchDuration}
+                            onChange={(e) => setLunchDuration(Number(e.target.value))}
+                            className="w-full bg-[#1b1d1b] border border-luma-card-border rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-luma-lime"
+                          >
+                            <option value={30}>30 minutes</option>
+                            <option value={45}>45 minutes</option>
+                            <option value={60}>60 minutes (1 hr)</option>
+                          </select>
+                        </div>
                       </div>
+
+                      <p className="text-[10px] text-luma-text-dim/80 italic">
+                        💡 Lunch slides dynamically within this window to align with natural task completion.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -710,73 +756,38 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
               </div>
             </div>
 
-            {/* SECTION 2: TOP PRIORITY & FIXED ANCHORS */}
+            {/* AUTO-LOCKED ANCHORS PREVIEW & RHYTHM PREFERENCE */}
             <div className="p-4 rounded-2xl bg-[#1b1d1b] border border-luma-card-border space-y-3.5">
-              <div className="flex items-center justify-between border-b border-white/[0.04] pb-2.5">
-                <div className="flex items-center gap-2">
-                  <Target className="w-4 h-4 text-luma-purple" />
-                  <span className="text-xs font-mono uppercase tracking-wider text-white font-semibold">
-                    2. Top Focus & Fixed Anchors
-                  </span>
-                </div>
-              </div>
-
-              {/* Top Priority Input */}
-              <div>
-                <label className="text-[11px] font-mono uppercase tracking-wider text-luma-text-dim block mb-1">
-                  Main Priority Today
-                </label>
-                <input
-                  type="text"
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value)}
-                  placeholder="e.g. Complete quarterly roadmap, deploy client dashboard..."
-                  className="w-full bg-[#141514] border border-luma-card-border rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-luma-text-dim/50 focus:outline-none focus:border-luma-lime"
-                />
-              </div>
-
-              {/* Fixed Commitments & Detected Anchors */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[11px] font-mono uppercase tracking-wider text-luma-text-dim">
-                    Fixed Commitments & Anchors (Locked Times)
-                  </label>
-                  {detectedAnchors.length > 0 && (
-                    <span className="text-[10px] font-mono text-amber-400">
-                      ⚡ {detectedAnchors.length} auto-detected
+              {/* Detected Anchors if available */}
+              {detectedAnchors.length > 0 && (
+                <div className="p-3 rounded-xl bg-[#21231a] border border-amber-500/25 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono uppercase tracking-wider text-amber-400 font-semibold flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      Auto-Locked Time Anchors ({detectedAnchors.length})
                     </span>
-                  )}
-                </div>
-
-                {/* Detected chips if available */}
-                {detectedAnchors.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    <span className="text-[10px] text-amber-300/80 font-mono">
+                      Pinned strictly to designated hours
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
                     {detectedAnchors.map(a => (
                       <span
                         key={a.id}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#24261f] border border-amber-500/30 text-amber-300 text-[11px] font-mono"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#2b2d20] border border-amber-500/30 text-amber-200 text-[11px] font-mono shadow-sm"
                       >
-                        <Clock className="w-3 h-3 text-amber-400" />
-                        <span>{a.scheduled_start || extractTimeFromText(a.title)}</span>
-                        <span className="text-white font-sans truncate max-w-[140px]">{a.title}</span>
+                        <span className="font-bold text-amber-400">{a.scheduled_start || extractTimeFromText(a.title)}</span>
+                        <span className="text-white/90 font-sans truncate max-w-[180px]">{a.title}</span>
                       </span>
                     ))}
                   </div>
-                )}
-
-                <input
-                  type="text"
-                  value={commitments}
-                  onChange={(e) => setCommitments(e.target.value)}
-                  placeholder="e.g. Team sync at 11:30, Doctor appointment at 15:00"
-                  className="w-full bg-[#141514] border border-luma-card-border rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-luma-text-dim/50 focus:outline-none focus:border-luma-lime"
-                />
-              </div>
+                </div>
+              )}
 
               {/* Rhythm Preference with Quick Presets */}
               <div>
-                <label className="text-[11px] font-mono uppercase tracking-wider text-luma-text-dim block mb-1">
-                  Cognitive Rhythm Preference
+                <label className="text-[11px] font-mono uppercase tracking-wider text-luma-text-dim block mb-1.5">
+                  Cognitive Rhythm Flow Preference
                 </label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {[
@@ -790,7 +801,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                       onClick={() => setPreference(preset)}
                       className={`text-[10px] px-2.5 py-1 rounded-lg border transition-all ${
                         preference === preset
-                          ? 'bg-[#252238] border-luma-purple text-white'
+                          ? 'bg-[#252238] border-luma-purple text-white font-medium'
                           : 'bg-[#141514] border-white/[0.06] text-luma-text-dim hover:text-white'
                       }`}
                     >
@@ -802,12 +813,13 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                   type="text"
                   value={preference}
                   onChange={(e) => setPreference(e.target.value)}
-                  className="w-full bg-[#141514] border border-luma-card-border rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-luma-text-dim/50 focus:outline-none focus:border-luma-lime"
+                  placeholder="Custom scheduling style preference..."
+                  className="w-full bg-[#141514] border border-luma-card-border rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-luma-text-dim/50 focus:outline-none focus:border-luma-lime font-mono"
                 />
               </div>
             </div>
 
-            {/* SECTION 3: ITEMS TO MERGE TODAY */}
+            {/* SECTION 2: ITEMS TO MERGE TODAY */}
             <div className="p-4 rounded-2xl bg-[#1b1d1b] border border-luma-card-border space-y-3.5">
               
               {/* Header + Segmented Tabs */}
@@ -815,7 +827,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                 <div className="flex items-center gap-2">
                   <Layers className="w-4 h-4 text-luma-lime" />
                   <span className="text-xs font-mono uppercase tracking-wider text-white font-semibold">
-                    3. Items to Merge Today
+                    2. Items to Merge Today
                   </span>
                 </div>
 
