@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { Env, Task } from '../types';
+import { Env, Task, isBreakOrRestBlock } from '../types';
 import { formatBlockReminder, formatTaskReminder, sendTelegramMessage } from '../services/telegram';
 
 export const remindersRouter = new Hono<{ Bindings: Env }>();
@@ -32,25 +32,7 @@ export async function checkAndSendReminders(env: Env): Promise<{
 
   const candidateMap = new Map<string, ReminderCandidate>();
 
-  // 1. Check tasks table with scheduled_start
-  const { results: tasks } = await env.DB.prepare(
-    'SELECT * FROM tasks WHERE status = "pending" AND scheduled_start IS NOT NULL'
-  ).all<Task>();
-
-  for (const t of (tasks || [])) {
-    if (t.scheduled_start) {
-      candidateMap.set(t.id, {
-        id: t.id,
-        title: t.title,
-        startTime: t.scheduled_start,
-        durationMinutes: t.duration_minutes || 30,
-        type: t.energy_level || 'light',
-        category: t.category
-      });
-    }
-  }
-
-  // 2. Check today's schedule timetable (including tasks, long-term goals, habits, rest breaks, and lunch)
+  // 1. Strictly evaluate items from the current date's timeline (schedules WHERE date = todayIST)
   try {
     const schedRow = await env.DB.prepare(
       'SELECT generated_plan FROM schedules WHERE date = ?'
@@ -59,19 +41,35 @@ export async function checkAndSendReminders(env: Env): Promise<{
     if (schedRow && schedRow.generated_plan) {
       const blocks: any[] = JSON.parse(schedRow.generated_plan);
       for (const b of blocks) {
-        if (b.start_time && b.status !== 'done') {
-          // Unique ID for each block (including lunch and rest breaks)
+        // Strictly send reminders for work & habit from the timeline (exclude breaks, rest, lunch, and untimed items)
+        if (b.start_time && b.status !== 'done' && !isBreakOrRestBlock(b) && !b.is_untimed) {
           const id = b.task_id || b.id || `sched-${todayIST}-${b.start_time}`;
-          if (!candidateMap.has(id)) {
-            candidateMap.set(id, {
-              id,
-              title: b.title,
-              startTime: b.start_time,
-              durationMinutes: b.duration || 30,
-              type: b.type,
-              category: b.category
-            });
-          }
+          candidateMap.set(id, {
+            id,
+            title: b.title,
+            startTime: b.start_time,
+            durationMinutes: b.duration || 30,
+            type: b.type,
+            category: b.category
+          });
+        }
+      }
+    } else {
+      // Fallback: If user hasn't shaped today's timeline yet, only check pending work tasks strictly belonging to today
+      const { results: tasks } = await env.DB.prepare(
+        'SELECT * FROM tasks WHERE status = "pending" AND scheduled_start IS NOT NULL AND task_date = ?'
+      ).bind(todayIST).all<Task>();
+
+      for (const t of (tasks || [])) {
+        if (t.scheduled_start && !isBreakOrRestBlock({ title: t.title, category: t.category })) {
+          candidateMap.set(t.id, {
+            id: t.id,
+            title: t.title,
+            startTime: t.scheduled_start,
+            durationMinutes: t.duration_minutes || 30,
+            type: t.energy_level || 'light',
+            category: t.category
+          });
         }
       }
     }

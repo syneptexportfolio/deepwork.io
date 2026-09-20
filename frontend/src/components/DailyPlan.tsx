@@ -277,6 +277,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
 
   // Toggle schedule status handler
   const handleToggleBlock = (blockId: string) => {
+    if (isPastDate) return;
     const targetBlock = (scheduleMap[selectedDateStr] || activeDaySchedule).find(b => b.id === blockId);
     if (targetBlock && isBreakOrRestBlock(targetBlock)) {
       return; // Breaks/rest/lunch cannot be marked as tasks
@@ -564,12 +565,21 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                     {/* Task or Recharge Card */}
                     <div
                       onClick={() => {
-                        if (!isBreak) {
+                        if (!isBreak && !isPastDate) {
                           handleToggleBlock(item.id);
                         }
                       }}
+                      title={
+                        isPastDate
+                          ? 'Archived day: Past timeline tasks cannot be modified'
+                          : isBreak
+                          ? 'Recharge Window'
+                          : isDone
+                          ? 'Click to mark pending'
+                          : 'Click to mark complete'
+                      }
                       className={`flex-1 flex items-center justify-between p-2.5 xs:p-3 sm:p-4 rounded-2xl border transition-all gap-1.5 xs:gap-2 min-w-0 ${
-                        isBreak ? 'cursor-default select-none' : 'cursor-pointer hover:brightness-110'
+                        isBreak || isPastDate ? 'cursor-default select-none' : 'cursor-pointer hover:brightness-110'
                       } ${cardBg}`}
                     >
                       <div className="flex items-center gap-1.5 xs:gap-2 flex-wrap min-w-0 flex-1">
@@ -579,6 +589,10 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                           </div>
                         ) : isDone ? (
                           <CheckCircle2 className="w-4 h-4 text-luma-lime shrink-0" />
+                        ) : isPastDate ? (
+                          <div className="w-4 h-4 rounded-full border border-white/20 flex items-center justify-center shrink-0" title="Archived task (Read-only)">
+                            <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                          </div>
                         ) : (
                           <Circle className="w-4 h-4 text-luma-text-dim group-hover:text-white shrink-0" />
                         )}

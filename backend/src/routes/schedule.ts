@@ -500,6 +500,14 @@ scheduleRouter.patch('/block/:blockId', async (c) => {
       return c.json({ success: false, error: 'No schedule found containing this block' }, 404);
     }
 
+    const todayIST = getTodayIST();
+    if (row.date && row.date < todayIST) {
+      return c.json({
+        success: false,
+        error: 'Cannot modify tasks for past dates. Past schedules are archived.'
+      }, 400);
+    }
+
     const blocks: ScheduleBlock[] = JSON.parse(row.generated_plan);
     const targetBlock = blocks.find(b => b.id === blockId);
 

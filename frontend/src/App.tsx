@@ -145,6 +145,10 @@ export const App: React.FC = () => {
   // Handlers
 
   const handleToggleScheduleStatus = async (scheduleId: string, dateStr?: string) => {
+    if (dateStr && dateStr < getTodayISTStr()) {
+      showToast('Cannot modify tasks for past dates. Past schedules are archived.', 'error');
+      return;
+    }
     const block = schedule.find(s => s.id === scheduleId);
     if (block && isBreakOrRestBlock(block)) {
       return; // Never toggle or count breaks as tasks
