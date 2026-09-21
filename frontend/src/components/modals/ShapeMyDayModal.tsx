@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   X, Sparkles, Clock, Zap, Sun, Moon, Check, Plus, Trash2, 
-  AlertCircle, CheckCircle2, Layers, Briefcase, Coffee, Compass,
+  AlertCircle, AlertTriangle, CheckCircle2, Layers, Briefcase, Coffee, Compass,
   BookOpen, Flame
 } from 'lucide-react';
 import { Habit, QuestionnaireAnswers, Task, WeeklyGoal, Goal, LongTermGoalDailyConfig, extractTimeFromText } from '../../services/api';
@@ -152,6 +152,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isOvercapacityNoticeOpen, setIsOvercapacityNoticeOpen] = useState(false);
 
   const isPastTarget = useMemo(() => {
     if (!targetDate) return false;
@@ -309,15 +310,30 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
   // Workload vs Available Hours Calculation (Hooks must run unconditionally on every render)
   const totalPlannedMinutes = useMemo(() => {
     let mins = 0;
+    const [sH, sM] = workStartTime.split(':').map(Number);
+    const [eH, eM] = workEndTime.split(':').map(Number);
+    const sMins = (sH || 0) * 60 + (sM || 0);
+    const eMins = (eH || 0) * 60 + (eM || 0);
+
     // Selected tasks
     const selTasks = tasks.filter(t => selectedTaskIds.includes(t.id));
     for (const t of selTasks) {
+      const timeStr = t.scheduled_start || extractTimeFromText(t.title);
+      if (timeStr && timeStr.includes(':')) {
+        const [tH, tM] = timeStr.split(':').map(Number);
+        const tMins = (tH || 0) * 60 + (tM || 0);
+        // If explicitly scheduled outside the daytime work window, do not count against daytime capacity
+        if (tMins < sMins || tMins >= eMins) {
+          continue;
+        }
+      }
       mins += t.duration_minutes > 0 ? t.duration_minutes : 20; // estimate 20m for untimed action items
     }
-    // Selected habits
+    // Selected habits (timed habits only)
     const selHabits = habits.filter(h => selectedHabitIds.includes(h.id));
     for (const h of selHabits) {
-      mins += h.duration_minutes > 0 ? h.duration_minutes : 10;
+      if (h.habit_type === 'check_off' || h.habit_type === 'target') continue;
+      mins += h.duration_minutes > 0 ? h.duration_minutes : 15;
     }
     // Selected long-term goals (uses custom duration per goal)
     for (const gId of selectedLongTermGoalIds) {
@@ -329,15 +345,43 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
       mins += td.duration_minutes || 20;
     }
     return mins;
-  }, [tasks, selectedTaskIds, habits, selectedHabitIds, selectedLongTermGoalIds, goalConfigs, morningTodos]);
+  }, [tasks, selectedTaskIds, habits, selectedHabitIds, selectedLongTermGoalIds, goalConfigs, morningTodos, workStartTime, workEndTime]);
 
   const plannedHours = (totalPlannedMinutes / 60).toFixed(1);
   const capacityPercent = Math.min(Math.round((totalPlannedMinutes / netFocusMinutes) * 100), 160);
+
+  // Recommended work end time when overcapacity
+  const recommendedWorkEndTime = useMemo(() => {
+    try {
+      const [sH, sM] = workStartTime.split(':').map(Number);
+      const sMins = (sH || 0) * 60 + (sM || 0);
+      const lunchMins = hasLunchBreak ? lunchDuration : 0;
+      const totalNeeded = sMins + totalPlannedMinutes + lunchMins;
+      // Round up to nearest 15 minutes
+      const roundedMins = Math.ceil(totalNeeded / 15) * 15;
+      const cappedMins = Math.min(23 * 60 + 45, roundedMins);
+      const endH = Math.floor(cappedMins / 60);
+      const endM = cappedMins % 60;
+      return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+    } catch {
+      return '19:00';
+    }
+  }, [workStartTime, totalPlannedMinutes, hasLunchBreak, lunchDuration]);
+
+  const handleAutoExtendWorkHours = () => {
+    setWorkEndTime(recommendedWorkEndTime);
+    setSelectedPreset('custom');
+    setIsOvercapacityNoticeOpen(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isPastTarget) {
       setErrorMessage('Past days cannot be shaped. Please select today or an upcoming day.');
+      return;
+    }
+    if (totalPlannedMinutes > netFocusMinutes) {
+      setIsOvercapacityNoticeOpen(true);
       return;
     }
     setErrorMessage(null);
@@ -470,7 +514,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
           <div className="px-6 py-4 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
 
             {/* SECTION 1: DAILY WINDOW & ENERGY PROFILE */}
-            <div className="p-4 rounded-2xl bg-[#1b1d1b] border border-luma-card-border space-y-4">
+            <div id="working-hours-section" className="p-4 rounded-2xl bg-[#1b1d1b] border border-luma-card-border space-y-4">
               <div className="flex items-center justify-between border-b border-white/[0.04] pb-2.5">
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-luma-lime" />
@@ -820,7 +864,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
             </div>
 
             {/* SECTION 2: ITEMS TO MERGE TODAY */}
-            <div className="p-4 rounded-2xl bg-[#1b1d1b] border border-luma-card-border space-y-3.5">
+            <div id="items-to-merge-section" className="p-4 rounded-2xl bg-[#1b1d1b] border border-luma-card-border space-y-3.5">
               
               {/* Header + Segmented Tabs */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.04] pb-3">
@@ -1570,20 +1614,125 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
               <button
                 type="submit"
                 disabled={loading || isPastTarget}
-                className="flex items-center justify-center gap-2 bg-luma-lime hover:bg-luma-lime-hover text-black px-4 sm:px-6 py-2.5 rounded-xl font-semibold text-xs shadow-lime-glow active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
+                onClick={(e) => {
+                  if (totalPlannedMinutes > netFocusMinutes) {
+                    e.preventDefault();
+                    setIsOvercapacityNoticeOpen(true);
+                  }
+                }}
+                className={`flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl font-semibold text-xs shadow-lime-glow active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap ${
+                  totalPlannedMinutes > netFocusMinutes
+                    ? 'bg-amber-400 hover:bg-amber-300 text-black shadow-amber-glow'
+                    : 'bg-luma-lime hover:bg-luma-lime-hover text-black'
+                }`}
               >
-                <Sparkles className="w-3.5 h-3.5 stroke-[2.5]" />
+                {totalPlannedMinutes > netFocusMinutes ? (
+                  <AlertTriangle className="w-3.5 h-3.5 stroke-[2.5]" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 stroke-[2.5]" />
+                )}
                 <span>
                   {loading
                     ? 'Synthesizing...'
                     : isPastTarget
                     ? 'Cannot Shape Past'
+                    : totalPlannedMinutes > netFocusMinutes
+                    ? 'Review Overcapacity'
                     : 'Generate Timetable'}
                 </span>
               </button>
             </div>
           </div>
         </form>
+
+        {/* OVERCAPACITY NOTICE MODAL POPUP */}
+        {isOvercapacityNoticeOpen && (
+          <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+            <div className="w-full max-w-md bg-[#181a18] border border-amber-500/40 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-white">Workload Exceeds Working Hours</h3>
+                    <p className="text-xs text-amber-400/90 font-mono">Overcapacity Notice</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsOvercapacityNoticeOpen(false)}
+                  className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Stats Card */}
+              <div className="p-3.5 rounded-2xl bg-[#141514] border border-white/[0.06] space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-luma-text-muted">Total Task Workload:</span>
+                  <span className="font-mono font-bold text-white">
+                    {Math.floor(totalPlannedMinutes / 60)}h {totalPlannedMinutes % 60}m
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-luma-text-muted">Available Working Time:</span>
+                  <span className="font-mono text-luma-text-dim">
+                    {Math.floor(netFocusMinutes / 60)}h {netFocusMinutes % 60}m ({workStartTime} – {workEndTime})
+                  </span>
+                </div>
+                <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between text-xs font-semibold">
+                  <span className="text-rose-400">Deficit:</span>
+                  <span className="font-mono text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">
+                    +{Math.floor((totalPlannedMinutes - netFocusMinutes) / 60)}h {(totalPlannedMinutes - netFocusMinutes) % 60}m over capacity
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-luma-text-muted leading-relaxed">
+                Your selected to-do tasks and study goals require more time than your configured workday window. Please expand your working hours or deselect/trim some tasks to build a realistic timeline.
+              </p>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleAutoExtendWorkHours}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-luma-lime hover:bg-luma-lime-hover text-black font-semibold text-xs transition-all shadow-lime-glow cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Auto-Extend Work End to {recommendedWorkEndTime}</span>
+                </button>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOvercapacityNoticeOpen(false);
+                      const el = document.getElementById('working-hours-section');
+                      el?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-medium transition-colors cursor-pointer text-center"
+                  >
+                    Adjust Hours
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOvercapacityNoticeOpen(false);
+                      const el = document.getElementById('items-to-merge-section');
+                      el?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-medium transition-colors cursor-pointer text-center"
+                  >
+                    Trim Tasks
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
