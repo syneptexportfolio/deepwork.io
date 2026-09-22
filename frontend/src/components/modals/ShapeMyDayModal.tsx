@@ -532,7 +532,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
         )}
 
         {/* 2. SCROLLABLE FORM BODY */}
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+        <form noValidate onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           <div className="px-6 py-4 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
 
             {/* SECTION 1: DAILY WINDOW & ENERGY PROFILE */}
@@ -1360,7 +1360,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                                           type="button"
                                           onClick={() => {
                                             const currentHours = cfg.durationMinutes / 60;
-                                            const newHours = Math.max(0.5, Math.round((currentHours - 0.5) * 2) / 2);
+                                            const newHours = Math.max(0.5, currentHours % 0.5 !== 0 ? Math.floor(currentHours * 2) / 2 : currentHours - 0.5);
                                             const newMins = Math.round(newHours * 60);
                                             setGoalConfigs(prev => ({
                                               ...prev,
@@ -1373,7 +1373,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                                             saveGoalDurationPreference(goal.id, newMins);
                                           }}
                                           disabled={cfg.durationMinutes <= 30}
-                                          className="w-4 h-4 flex items-center justify-center text-luma-text-dim hover:text-white disabled:opacity-30 disabled:cursor-not-allowed text-xs font-mono"
+                                          className="w-4 h-4 flex items-center justify-center text-luma-text-dim hover:text-white disabled:opacity-30 disabled:cursor-not-allowed text-xs font-mono cursor-pointer"
                                           title="Decrease by 0.5 hr"
                                         >
                                           <Minus className="w-3 h-3 stroke-[2.5]" />
@@ -1381,9 +1381,10 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
 
                                         <input
                                           type="number"
-                                          step="0.5"
-                                          min="0.25"
+                                          step="any"
+                                          min="0"
                                           max="8"
+                                          inputMode="decimal"
                                           value={cfg.customHoursText !== undefined ? cfg.customHoursText : (cfg.durationMinutes / 60).toString()}
                                           onChange={(e) => {
                                             const rawVal = e.target.value;
@@ -1409,7 +1410,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                                           type="button"
                                           onClick={() => {
                                             const currentHours = cfg.durationMinutes / 60;
-                                            const newHours = Math.min(8, Math.round((currentHours + 0.5) * 2) / 2);
+                                            const newHours = Math.min(8, currentHours % 0.5 !== 0 ? Math.ceil(currentHours * 2) / 2 : currentHours + 0.5);
                                             const newMins = Math.round(newHours * 60);
                                             setGoalConfigs(prev => ({
                                               ...prev,
@@ -1422,7 +1423,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                                             saveGoalDurationPreference(goal.id, newMins);
                                           }}
                                           disabled={cfg.durationMinutes >= 480}
-                                          className="w-4 h-4 flex items-center justify-center text-luma-text-dim hover:text-white disabled:opacity-30 disabled:cursor-not-allowed text-xs font-mono"
+                                          className="w-4 h-4 flex items-center justify-center text-luma-text-dim hover:text-white disabled:opacity-30 disabled:cursor-not-allowed text-xs font-mono cursor-pointer"
                                           title="Increase by 0.5 hr"
                                         >
                                           <Plus className="w-3 h-3 stroke-[2.5]" />
