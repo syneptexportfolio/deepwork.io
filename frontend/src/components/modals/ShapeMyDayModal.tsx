@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  X, Sparkles, Clock, Zap, Sun, Moon, Check, Plus, Trash2, 
+  X, Sparkles, Clock, Zap, Sun, Moon, Check, Plus, Minus, Trash2, 
   AlertCircle, AlertTriangle, CheckCircle2, Layers, Briefcase, Coffee, Compass,
   BookOpen, Flame
 } from 'lucide-react';
@@ -11,6 +11,22 @@ export interface GoalDailyConfigState {
   taskTitle: string;
   durationMinutes: number;
   energyLevel: 'deep_focus' | 'light';
+  customHoursText?: string;
+}
+
+export function formatDurationHoursDisplay(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const hours = minutes / 60;
+  return hours % 1 === 0 ? `${hours} hr${hours > 1 ? 's' : ''}` : `${hours.toFixed(1)} hrs`;
+}
+
+export function saveGoalDurationPreference(goalId: string, durationMinutes: number): void {
+  try {
+    const raw = localStorage.getItem('luma_goal_custom_durations');
+    const existing = raw ? JSON.parse(raw) : {};
+    existing[goalId] = durationMinutes;
+    localStorage.setItem('luma_goal_custom_durations', JSON.stringify(existing));
+  } catch {}
 }
 
 export interface DomainActionPreset {
@@ -206,13 +222,21 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
       // 3. Active long-term goals / learning paths
       setSelectedLongTermGoalIds(goals.map(g => g.id));
       const initialConfigs: Record<string, GoalDailyConfigState> = {};
+      let savedGoalDurations: Record<string, number> = {};
+      try {
+        const raw = localStorage.getItem('luma_goal_custom_durations');
+        if (raw) savedGoalDurations = JSON.parse(raw);
+      } catch {}
+
       for (const g of goals) {
         const nextTopic = g.syllabus?.find((s: any) => !s.covered) || g.syllabus?.[0];
+        const dur = savedGoalDurations[g.id] && savedGoalDurations[g.id] > 0 ? savedGoalDurations[g.id] : 60;
         initialConfigs[g.id] = {
           topicId: nextTopic?.id || '',
           taskTitle: nextTopic ? `${g.title}: ${nextTopic.name}` : `${g.title}: Roadmap Milestone`,
-          durationMinutes: 60,
+          durationMinutes: dur,
           energyLevel: 'deep_focus',
+          customHoursText: (dur / 60).toString(),
         };
       }
       setGoalConfigs(prev => ({ ...initialConfigs, ...prev }));
@@ -1188,7 +1212,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                                   {coveredTopics}/{totalTopics} units ({pct}%)
                                 </span>
                                 <span className="text-[10px] font-mono text-luma-text-dim">
-                                  ~{cfg.durationMinutes}m study block
+                                  ~{formatDurationHoursDisplay(cfg.durationMinutes)} study block
                                 </span>
                               </div>
                             </div>
@@ -1288,73 +1312,169 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                                   />
                                 </div>
 
-                                {/* 4. Duration & Energy Level Selectors */}
-                                <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/[0.04]">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-[10px] font-mono text-luma-text-dim">Duration:</span>
-                                    {[30, 45, 60, 90].map(dur => (
+                                {/* 4. Duration (in Hours) & Energy Level Selectors */}
+                                <div className="pt-2 border-t border-white/[0.04] space-y-2">
+                                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-[10px] font-mono text-luma-text-dim flex items-center gap-1">
+                                        <Clock className="w-3 h-3 text-[#60a5fa]" />
+                                        Timing (hrs):
+                                      </span>
+                                      {[
+                                        { label: '45m', mins: 45, hrs: '0.75' },
+                                        { label: '1h', mins: 60, hrs: '1' },
+                                        { label: '1.5h', mins: 90, hrs: '1.5' },
+                                        { label: '2h', mins: 120, hrs: '2' },
+                                        { label: '3h', mins: 180, hrs: '3' },
+                                      ].map(preset => {
+                                        const isSelected = cfg.durationMinutes === preset.mins;
+                                        return (
+                                          <button
+                                            key={preset.label}
+                                            type="button"
+                                            onClick={() => {
+                                              setGoalConfigs(prev => ({
+                                                ...prev,
+                                                [goal.id]: {
+                                                  ...cfg,
+                                                  durationMinutes: preset.mins,
+                                                  customHoursText: preset.hrs
+                                                }
+                                              }));
+                                              saveGoalDurationPreference(goal.id, preset.mins);
+                                            }}
+                                            className={`px-2 py-0.5 rounded-lg text-[10px] font-mono transition-all ${
+                                              isSelected
+                                                ? 'bg-[#3b82f6] text-white font-bold shadow-sm'
+                                                : 'bg-[#141514] text-luma-text-dim border border-white/10 hover:text-white hover:border-white/20'
+                                            }`}
+                                          >
+                                            {preset.label}
+                                          </button>
+                                        );
+                                      })}
+
+                                      {/* Custom Hours Stepper & Direct Input */}
+                                      <div className="flex items-center gap-1 bg-[#131c2b] border border-[#3b82f6]/40 rounded-lg px-1.5 py-0.5 ml-0.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const currentHours = cfg.durationMinutes / 60;
+                                            const newHours = Math.max(0.5, Math.round((currentHours - 0.5) * 2) / 2);
+                                            const newMins = Math.round(newHours * 60);
+                                            setGoalConfigs(prev => ({
+                                              ...prev,
+                                              [goal.id]: {
+                                                ...cfg,
+                                                durationMinutes: newMins,
+                                                customHoursText: newHours.toString()
+                                              }
+                                            }));
+                                            saveGoalDurationPreference(goal.id, newMins);
+                                          }}
+                                          disabled={cfg.durationMinutes <= 30}
+                                          className="w-4 h-4 flex items-center justify-center text-luma-text-dim hover:text-white disabled:opacity-30 disabled:cursor-not-allowed text-xs font-mono"
+                                          title="Decrease by 0.5 hr"
+                                        >
+                                          <Minus className="w-3 h-3 stroke-[2.5]" />
+                                        </button>
+
+                                        <input
+                                          type="number"
+                                          step="0.5"
+                                          min="0.25"
+                                          max="8"
+                                          value={cfg.customHoursText !== undefined ? cfg.customHoursText : (cfg.durationMinutes / 60).toString()}
+                                          onChange={(e) => {
+                                            const rawVal = e.target.value;
+                                            const parsed = parseFloat(rawVal);
+                                            const validHours = isNaN(parsed) || parsed <= 0 ? 0.5 : Math.min(8, parsed);
+                                            const newMins = Math.round(validHours * 60);
+                                            setGoalConfigs(prev => ({
+                                              ...prev,
+                                              [goal.id]: {
+                                                ...cfg,
+                                                durationMinutes: newMins,
+                                                customHoursText: rawVal
+                                              }
+                                            }));
+                                            saveGoalDurationPreference(goal.id, newMins);
+                                          }}
+                                          placeholder="hrs"
+                                          className="w-9 bg-transparent text-center text-white text-xs font-mono focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-semibold text-[#60a5fa]"
+                                        />
+                                        <span className="text-[10px] font-mono text-luma-text-dim pr-0.5">hrs</span>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const currentHours = cfg.durationMinutes / 60;
+                                            const newHours = Math.min(8, Math.round((currentHours + 0.5) * 2) / 2);
+                                            const newMins = Math.round(newHours * 60);
+                                            setGoalConfigs(prev => ({
+                                              ...prev,
+                                              [goal.id]: {
+                                                ...cfg,
+                                                durationMinutes: newMins,
+                                                customHoursText: newHours.toString()
+                                              }
+                                            }));
+                                            saveGoalDurationPreference(goal.id, newMins);
+                                          }}
+                                          disabled={cfg.durationMinutes >= 480}
+                                          className="w-4 h-4 flex items-center justify-center text-luma-text-dim hover:text-white disabled:opacity-30 disabled:cursor-not-allowed text-xs font-mono"
+                                          title="Increase by 0.5 hr"
+                                        >
+                                          <Plus className="w-3 h-3 stroke-[2.5]" />
+                                        </button>
+                                      </div>
+
+                                      <span className="text-[9px] font-mono text-[#60a5fa]/75">
+                                        ({cfg.durationMinutes}m)
+                                      </span>
+                                    </div>
+
+                                    {/* Energy Level Toggle */}
+                                    <div className="flex items-center gap-1 shrink-0 ml-auto">
                                       <button
-                                        key={dur}
                                         type="button"
                                         onClick={() => {
                                           setGoalConfigs(prev => ({
                                             ...prev,
                                             [goal.id]: {
                                               ...cfg,
-                                              durationMinutes: dur
+                                              energyLevel: 'deep_focus'
                                             }
                                           }));
                                         }}
-                                        className={`px-2.5 py-0.5 rounded-lg text-[10px] font-mono transition-all ${
-                                          cfg.durationMinutes === dur
-                                            ? 'bg-[#3b82f6] text-white font-bold shadow-sm'
-                                            : 'bg-[#141514] text-luma-text-dim border border-white/10 hover:text-white'
+                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-mono transition-all ${
+                                          cfg.energyLevel === 'deep_focus'
+                                            ? 'bg-purple-950/70 text-purple-200 border border-purple-500/40 shadow-sm'
+                                            : 'text-luma-text-dim hover:text-white bg-[#141514] border border-white/5'
                                         }`}
                                       >
-                                        {dur}m
+                                        ⚡ Deep Focus
                                       </button>
-                                    ))}
-                                  </div>
-
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setGoalConfigs(prev => ({
-                                          ...prev,
-                                          [goal.id]: {
-                                            ...cfg,
-                                            energyLevel: 'deep_focus'
-                                          }
-                                        }));
-                                      }}
-                                      className={`px-2.5 py-0.5 rounded-lg text-[10px] font-mono transition-all ${
-                                        cfg.energyLevel === 'deep_focus'
-                                          ? 'bg-purple-950/70 text-purple-200 border border-purple-500/40'
-                                          : 'text-luma-text-dim hover:text-white'
-                                      }`}
-                                    >
-                                      ⚡ Deep Focus
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setGoalConfigs(prev => ({
-                                          ...prev,
-                                          [goal.id]: {
-                                            ...cfg,
-                                            energyLevel: 'light'
-                                          }
-                                        }));
-                                      }}
-                                      className={`px-2.5 py-0.5 rounded-lg text-[10px] font-mono transition-all ${
-                                        cfg.energyLevel === 'light'
-                                          ? 'bg-amber-950/70 text-amber-200 border border-amber-500/40'
-                                          : 'text-luma-text-dim hover:text-white'
-                                      }`}
-                                    >
-                                      ☕ Light
-                                    </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setGoalConfigs(prev => ({
+                                            ...prev,
+                                            [goal.id]: {
+                                              ...cfg,
+                                              energyLevel: 'light'
+                                            }
+                                          }));
+                                        }}
+                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-mono transition-all ${
+                                          cfg.energyLevel === 'light'
+                                            ? 'bg-amber-950/70 text-amber-200 border border-amber-500/40 shadow-sm'
+                                            : 'text-luma-text-dim hover:text-white bg-[#141514] border border-white/5'
+                                        }`}
+                                      >
+                                        ☕ Light
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
