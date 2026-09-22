@@ -453,6 +453,7 @@ export const App: React.FC = () => {
     if (res.schedule) {
       if (!targetDate || targetDate === todayIST) {
         setSchedule(res.schedule);
+        setCachedJson('schedule', res.schedule);
       }
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.5 } });
     }

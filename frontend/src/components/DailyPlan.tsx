@@ -153,13 +153,13 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
   const [activeDates, setActiveDates] = useState<string[]>([]);
   const [loadingDay, setLoadingDay] = useState(false);
 
-  // Sync today's schedule from prop into scheduleMap
+  // Sync today's schedule from prop into scheduleMap whenever schedule prop updates
   useEffect(() => {
     if (schedule && schedule.length > 0) {
-      setScheduleMap(prev => {
-        if (prev[todayDateStr]) return prev;
-        return { ...prev, [todayDateStr]: schedule };
-      });
+      setScheduleMap(prev => ({
+        ...prev,
+        [todayDateStr]: schedule,
+      }));
     }
   }, [schedule, todayDateStr]);
 
@@ -207,7 +207,7 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
     };
 
     fetchDaySchedule();
-  }, [selectedDateStr, todayDateStr]);
+  }, [selectedDateStr, todayDateStr, schedule]);
 
   // Track live current time (HH:MM) to highlight active block in real-time
   const [currentHHMM, setCurrentHHMM] = useState(() => {
@@ -467,6 +467,18 @@ export const DailyPlan: React.FC<DailyPlanProps> = ({
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                   <span>Add task</span>
+                </button>
+              )}
+              {/* Quick Reshape Button inside Sequence Card */}
+              {!isPastDate && onOpenShapeMyDay && (
+                <button
+                  type="button"
+                  onClick={() => onOpenShapeMyDay(selectedDateStr)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-white font-semibold text-xs border border-white/10 transition-all active:scale-95 cursor-pointer"
+                  title="Reshape this day's timetable"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-luma-lime stroke-[2.2]" />
+                  <span>Reshape</span>
                 </button>
               )}
               {savedWorkHours?.workStartTime && savedWorkHours?.workEndTime && (
