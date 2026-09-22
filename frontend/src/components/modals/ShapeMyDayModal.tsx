@@ -172,7 +172,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
   const [selectedLunchPreset, setSelectedLunchPreset] = useState<string>('standard');
   const [selectedPreset, setSelectedPreset] = useState<string>('9-5');
   const [energy, setEnergy] = useState<'deep_focus' | 'light'>('deep_focus');
-  const [preference, setPreference] = useState('Deep focus in morning, lighter review in afternoon');
+  const [preference, setPreference] = useState('Continuous focused flow across the workday');
 
   // Section 3: Selections
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
@@ -302,10 +302,8 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
     setMorningTodos(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Group pending tasks by time-of-day bucket
-  const morningTasks = tasks.filter(t => t.status === 'pending' && t.column_bucket === 'now');
-  const afternoonTasks = tasks.filter(t => t.status === 'pending' && t.column_bucket === 'up_next');
-  const eveningTasks = tasks.filter(t => t.status === 'pending' && t.column_bucket === 'later');
+  // Pending tasks for today
+  const pendingTasks = useMemo(() => tasks.filter(t => t.status === 'pending'), [tasks]);
 
   // Workload vs Available Hours Calculation (Hooks must run unconditionally on every render)
   const totalPlannedMinutes = useMemo(() => {
@@ -835,9 +833,9 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                 </label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {[
-                    'Deep focus in morning, lighter review in afternoon',
-                    'Balanced 60-min intervals with regular breaks',
-                    'Errands & meetings midday, evening focus sprint'
+                    'Continuous focused flow across the workday',
+                    'Alternating learning goals with daily to-dos',
+                    'High priority tasks first, lighter tasks later'
                   ].map((preset) => (
                     <button
                       key={preset}
@@ -932,7 +930,7 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                         : 'text-luma-text-dim hover:text-white'
                     }`}
                   >
-                    <span>Quick</span>
+                    <span>Quick To-Dos</span>
                     {morningTodos.length > 0 && (
                       <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-luma-lime/20 text-luma-lime">
                         {morningTodos.length}
@@ -971,156 +969,47 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                       No pending tasks found. Add tasks on the Tasks board or use Quick Brain-Dump!
                     </div>
                   ) : (
-                    <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                      {/* Morning Group */}
-                      {morningTasks.length > 0 && (
-                        <div className="space-y-1.5">
-                          <div className="text-[10px] font-mono uppercase tracking-wider text-amber-400/90 flex items-center gap-1 pl-1">
-                            <span>🌅 Morning</span>
-                            <span className="text-luma-text-dim">({morningTasks.length})</span>
-                          </div>
-                          {morningTasks.map(t => {
-                            const isChecked = selectedTaskIds.includes(t.id);
-                            return (
-                              <div
-                                key={t.id}
-                                onClick={() => toggleTask(t.id)}
-                                className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all text-xs ${
-                                  isChecked
-                                    ? 'bg-[#1f211c] border-luma-lime/40 text-white'
-                                    : 'bg-[#141514] border-white/[0.04] text-luma-text-dim opacity-60'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
-                                    isChecked ? 'bg-luma-lime border-luma-lime text-black' : 'border-luma-text-dim'
-                                  }`}>
-                                    {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                                  </div>
-                                  <span className="truncate font-medium">{t.title}</span>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0 font-mono text-[10px]">
-                                  {(t.scheduled_start || extractTimeFromText(t.title)) && (
-                                    <span className="px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-500/20">
-                                      🕒 {t.scheduled_start || extractTimeFromText(t.title)}
-                                    </span>
-                                  )}
-                                  <span className="text-luma-text-dim">
-                                    {t.duration_minutes > 0 ? `${t.duration_minutes}m` : '⚡ Untimed'}
-                                  </span>
-                                  <span className={`px-1.5 py-0.5 rounded text-[9px] ${
-                                    t.priority === 'HIGH' ? 'bg-red-500/20 text-red-300' :
-                                    t.priority === 'LOW' ? 'bg-blue-500/20 text-blue-300' :
-                                    'bg-white/5 text-luma-text-dim'
-                                  }`}>
-                                    {t.priority}
-                                  </span>
-                                </div>
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                      {pendingTasks.map(t => {
+                        const isChecked = selectedTaskIds.includes(t.id);
+                        return (
+                          <div
+                            key={t.id}
+                            onClick={() => toggleTask(t.id)}
+                            className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all text-xs ${
+                              isChecked
+                                ? 'bg-[#1f211c] border-luma-lime/40 text-white'
+                                : 'bg-[#141514] border-white/[0.04] text-luma-text-dim opacity-60'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
+                                isChecked ? 'bg-luma-lime border-luma-lime text-black' : 'border-luma-text-dim'
+                              }`}>
+                                {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* Afternoon Group */}
-                      {afternoonTasks.length > 0 && (
-                        <div className="space-y-1.5 pt-1">
-                          <div className="text-[10px] font-mono uppercase tracking-wider text-sky-400/90 flex items-center gap-1 pl-1">
-                            <span>☀️ Afternoon</span>
-                            <span className="text-luma-text-dim">({afternoonTasks.length})</span>
+                              <span className="truncate font-medium">{t.title}</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0 font-mono text-[10px]">
+                              {(t.scheduled_start || extractTimeFromText(t.title)) && (
+                                <span className="px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-500/20">
+                                  🕒 {t.scheduled_start || extractTimeFromText(t.title)}
+                                </span>
+                              )}
+                              <span className="text-luma-text-dim">
+                                {t.duration_minutes > 0 ? `${t.duration_minutes}m` : '⚡ Untimed'}
+                              </span>
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] ${
+                                t.priority === 'HIGH' ? 'bg-red-500/20 text-red-300' :
+                                t.priority === 'LOW' ? 'bg-blue-500/20 text-blue-300' :
+                                'bg-white/5 text-luma-text-dim'
+                              }`}>
+                                {t.priority}
+                              </span>
+                            </div>
                           </div>
-                          {afternoonTasks.map(t => {
-                            const isChecked = selectedTaskIds.includes(t.id);
-                            return (
-                              <div
-                                key={t.id}
-                                onClick={() => toggleTask(t.id)}
-                                className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all text-xs ${
-                                  isChecked
-                                    ? 'bg-[#1a2128] border-sky-400/40 text-white'
-                                    : 'bg-[#141514] border-white/[0.04] text-luma-text-dim opacity-60'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
-                                    isChecked ? 'bg-sky-400 border-sky-400 text-black' : 'border-luma-text-dim'
-                                  }`}>
-                                    {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                                  </div>
-                                  <span className="truncate font-medium">{t.title}</span>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0 font-mono text-[10px]">
-                                  {(t.scheduled_start || extractTimeFromText(t.title)) && (
-                                    <span className="px-1.5 py-0.5 rounded bg-sky-400/10 text-sky-300 border border-sky-500/20">
-                                      🕒 {t.scheduled_start || extractTimeFromText(t.title)}
-                                    </span>
-                                  )}
-                                  <span className="text-luma-text-dim">
-                                    {t.duration_minutes > 0 ? `${t.duration_minutes}m` : '⚡ Untimed'}
-                                  </span>
-                                  <span className={`px-1.5 py-0.5 rounded text-[9px] ${
-                                    t.priority === 'HIGH' ? 'bg-red-500/20 text-red-300' :
-                                    t.priority === 'LOW' ? 'bg-blue-500/20 text-blue-300' :
-                                    'bg-white/5 text-luma-text-dim'
-                                  }`}>
-                                    {t.priority}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* Evening Group */}
-                      {eveningTasks.length > 0 && (
-                        <div className="space-y-1.5 pt-1">
-                          <div className="text-[10px] font-mono uppercase tracking-wider text-purple-400/90 flex items-center gap-1 pl-1">
-                            <span>🌙 Evening</span>
-                            <span className="text-luma-text-dim">({eveningTasks.length})</span>
-                          </div>
-                          {eveningTasks.map(t => {
-                            const isChecked = selectedTaskIds.includes(t.id);
-                            return (
-                              <div
-                                key={t.id}
-                                onClick={() => toggleTask(t.id)}
-                                className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all text-xs ${
-                                  isChecked
-                                    ? 'bg-[#231b2c] border-purple-400/40 text-white'
-                                    : 'bg-[#141514] border-white/[0.04] text-luma-text-dim opacity-60'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
-                                    isChecked ? 'bg-purple-400 border-purple-400 text-black' : 'border-luma-text-dim'
-                                  }`}>
-                                    {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                                  </div>
-                                  <span className="truncate font-medium">{t.title}</span>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0 font-mono text-[10px]">
-                                  {(t.scheduled_start || extractTimeFromText(t.title)) && (
-                                    <span className="px-1.5 py-0.5 rounded bg-purple-400/10 text-purple-300 border border-purple-500/20">
-                                      🕒 {t.scheduled_start || extractTimeFromText(t.title)}
-                                    </span>
-                                  )}
-                                  <span className="text-luma-text-dim">
-                                    {t.duration_minutes > 0 ? `${t.duration_minutes}m` : '⚡ Untimed'}
-                                  </span>
-                                  <span className={`px-1.5 py-0.5 rounded text-[9px] ${
-                                    t.priority === 'HIGH' ? 'bg-red-500/20 text-red-300' :
-                                    t.priority === 'LOW' ? 'bg-blue-500/20 text-blue-300' :
-                                    'bg-white/5 text-luma-text-dim'
-                                  }`}>
-                                    {t.priority}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1478,11 +1367,11 @@ export const ShapeMyDayModal: React.FC<ShapeMyDayModalProps> = ({
                 </div>
               )}
 
-              {/* TAB CONTENT: QUICK MORNING TO-DOS */}
+              {/* TAB CONTENT: QUICK TO-DOS */}
               {activeTab === 'todos' && (
                 <div className="space-y-3">
                   <div className="text-[11px] text-luma-text-dim">
-                    Rapidly brain-dump quick to-dos for today without creating full task cards:
+                    Rapidly brain-dump quick action items for today without creating full task cards:
                   </div>
 
                   <div className="flex gap-2">

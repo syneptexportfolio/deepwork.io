@@ -13,7 +13,7 @@ import {
   Minus,
   Plus,
 } from 'lucide-react';
-import { Task, extractTimeFromText, getTimeBucket } from '../../services/api';
+import { Task, extractTimeFromText } from '../../services/api';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -41,7 +41,6 @@ const TEMPLATES = [
     duration: 0,
     priority: 'HIGH' as const,
     energyLevel: 'light' as const,
-    columnBucket: 'up_next' as const,
   },
   {
     label: '📞 Call & Outreach',
@@ -51,7 +50,6 @@ const TEMPLATES = [
     duration: 0,
     priority: 'MEDIUM' as const,
     energyLevel: 'light' as const,
-    columnBucket: 'up_next' as const,
   },
   {
     label: '📍 Errand / Visit',
@@ -61,7 +59,6 @@ const TEMPLATES = [
     duration: 0,
     priority: 'LOW' as const,
     energyLevel: 'light' as const,
-    columnBucket: 'up_next' as const,
   },
   {
     label: '💻 Ship Core Module',
@@ -71,7 +68,6 @@ const TEMPLATES = [
     duration: 60,
     priority: 'HIGH' as const,
     energyLevel: 'deep_focus' as const,
-    columnBucket: 'now' as const,
   },
   {
     label: '📚 Syllabus Mastery',
@@ -81,7 +77,6 @@ const TEMPLATES = [
     duration: 45,
     priority: 'HIGH' as const,
     energyLevel: 'deep_focus' as const,
-    columnBucket: 'now' as const,
   },
   {
     label: '🏃 Workout Session',
@@ -91,7 +86,6 @@ const TEMPLATES = [
     duration: 45,
     priority: 'MEDIUM' as const,
     energyLevel: 'light' as const,
-    columnBucket: 'later' as const,
   },
   {
     label: '⚡ Inbox Zero & Triage',
@@ -101,7 +95,6 @@ const TEMPLATES = [
     duration: 15,
     priority: 'LOW' as const,
     energyLevel: 'light' as const,
-    columnBucket: 'now' as const,
   },
 ];
 
@@ -120,7 +113,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [priority, setPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('HIGH');
   const [energyLevel, setEnergyLevel] = useState<'deep_focus' | 'light'>('deep_focus');
   const [category, setCategory] = useState('Project');
-  const [columnBucket, setColumnBucket] = useState<'now' | 'up_next' | 'later'>('now');
   const [scheduledStart, setScheduledStart] = useState('');
   const [loading, setLoading] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
@@ -135,7 +127,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setPriority(task.priority || 'HIGH');
       setEnergyLevel(task.energy_level || 'deep_focus');
       setCategory(task.category || 'Project');
-      setColumnBucket(task.column_bucket || 'now');
       setScheduledStart(task.scheduled_start || '');
     } else {
       setTitle('');
@@ -144,7 +135,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setPriority('HIGH');
       setEnergyLevel('deep_focus');
       setCategory('Project');
-      setColumnBucket('now');
       setScheduledStart('');
     }
   }, [task, isOpen]);
@@ -158,7 +148,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     setDuration(tmpl.duration);
     setPriority(tmpl.priority);
     setEnergyLevel(tmpl.energyLevel);
-    setColumnBucket(tmpl.columnBucket);
   };
 
   const setTimeNow = () => {
@@ -185,12 +174,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       const detected = !scheduledStart ? extractTimeFromText(title.trim()) : null;
       const finalScheduledStart = scheduledStart || detected || null;
       let finalCategory = category.trim() || 'General';
-      let finalBucket = finalScheduledStart ? getTimeBucket(finalScheduledStart) : columnBucket;
       let finalEnergy = energyLevel;
 
       if (finalScheduledStart && finalScheduledStart >= '17:00') {
         if (finalCategory === 'Project' || finalCategory === 'General') finalCategory = 'Personal & Social';
-        finalBucket = 'later';
         if (finalEnergy === 'deep_focus') finalEnergy = 'light';
       }
 
@@ -200,7 +187,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
         priority,
         energy_level: finalEnergy,
         category: finalCategory,
-        column_bucket: finalBucket,
+        column_bucket: 'now',
         scheduled_start: finalScheduledStart,
       });
       onClose();
@@ -290,7 +277,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                     if (detected) {
                       setScheduledStart(detected);
                       if (detected >= '17:00') {
-                        setColumnBucket('later');
                         setCategory('Personal & Social');
                       }
                     }
@@ -449,58 +435,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               )}
             </div>
 
-            {/* QUEUE PLACEMENT (MORNING / AFTERNOON / EVENING) */}
-            <div>
-              <label className="text-xs font-mono uppercase tracking-wider text-luma-text-dim block mb-1.5">
-                Queue Placement (Time of Day)
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setColumnBucket('now')}
-                  className={`p-2.5 rounded-xl border text-left transition-all ${
-                    columnBucket === 'now'
-                      ? 'bg-luma-lime/10 border-luma-lime text-white shadow-sm'
-                      : 'bg-[#1b1c1b] border-luma-card-border text-luma-text-muted hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  <div className="text-xs font-bold text-luma-lime flex items-center gap-1.5 mb-0.5">
-                    <span>🌅 MORNING</span>
-                  </div>
-                  <span className="text-[10px] text-luma-text-dim block">Start of day focus</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setColumnBucket('up_next')}
-                  className={`p-2.5 rounded-xl border text-left transition-all ${
-                    columnBucket === 'up_next'
-                      ? 'bg-[#292418] border-amber-500/60 text-white shadow-sm'
-                      : 'bg-[#1b1c1b] border-luma-card-border text-luma-text-muted hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5 mb-0.5">
-                    <span>☀️ AFTERNOON</span>
-                  </div>
-                  <span className="text-[10px] text-luma-text-dim block">Midday, calls & meetings</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setColumnBucket('later')}
-                  className={`p-2.5 rounded-xl border text-left transition-all ${
-                    columnBucket === 'later'
-                      ? 'bg-[#252238] border-luma-purple text-white shadow-sm'
-                      : 'bg-[#1b1c1b] border-luma-card-border text-luma-text-muted hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  <div className="text-xs font-bold text-purple-400 flex items-center gap-1.5 mb-0.5">
-                    <span>🌙 EVENING</span>
-                  </div>
-                  <span className="text-[10px] text-luma-text-dim block">Night wrap-up & review</span>
-                </button>
-              </div>
-            </div>
 
             {/* PRIORITY & COGNITIVE ENERGY */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

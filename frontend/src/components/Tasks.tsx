@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Minus, Flame, Sun, Waves, Moon, CheckCircle2, ArrowRight, Trash2, Pencil, RotateCcw, Target, Clock, Trophy, Calendar } from 'lucide-react';
-import { Habit, Task, WeeklyGoal, getTimeBucket } from '../services/api';
+import { Habit, Task, WeeklyGoal } from '../services/api';
 
 import { normalizeHabitDays, WEEK_DAYS_CONFIG } from './modals/HabitModal';
 
@@ -83,16 +83,24 @@ export const Tasks: React.FC<TasksProps> = ({
     return Object.entries(counts).map(([name, count]) => ({ name, count }));
   }, [weeklyGoals]);
 
-  const getTaskBucket = (task: Task): 'now' | 'up_next' | 'later' => {
-    if (task.scheduled_start) {
-      return getTimeBucket(task.scheduled_start);
-    }
-    return task.column_bucket || 'now';
-  };
+  const orderedTasks = useMemo(() => {
+    return [...filteredTasks].sort((a, b) => {
+      // 1. Scheduled start times come first chronologically
+      if (a.scheduled_start && b.scheduled_start) {
+        return a.scheduled_start.localeCompare(b.scheduled_start);
+      }
+      if (a.scheduled_start) return -1;
+      if (b.scheduled_start) return 1;
 
-  const morningTasks = filteredTasks.filter(t => getTaskBucket(t) === 'now');
-  const afternoonTasks = filteredTasks.filter(t => getTaskBucket(t) === 'up_next');
-  const eveningTasks = filteredTasks.filter(t => getTaskBucket(t) === 'later');
+      // 2. High priority first
+      const pOrder = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+      const aP = pOrder[a.priority as keyof typeof pOrder] ?? 1;
+      const bP = pOrder[b.priority as keyof typeof pOrder] ?? 1;
+      if (aP !== bP) return aP - bP;
+
+      return (b.created_at || '').localeCompare(a.created_at || '');
+    });
+  }, [filteredTasks]);
 
   const handleQuickSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -362,52 +370,24 @@ export const Tasks: React.FC<TasksProps> = ({
             </div>
           </div>
 
-          {/* 3 Time-of-Day Columns: Morning, Afternoon, Evening */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-4">
-              <span className="text-xs font-mono tracking-widest uppercase text-luma-lime font-bold px-1 flex items-center gap-1.5">
-                <span>🌅 MORNING</span>
-                <span className="text-luma-text-dim font-normal">· {morningTasks.length}</span>
+          {/* Unified Tasks Grid */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-mono tracking-widest uppercase text-white/80 font-bold flex items-center gap-1.5">
+                <span>⚡ TODAY'S COMMITMENTS</span>
+                <span className="text-luma-text-dim font-normal">· {orderedTasks.length}</span>
               </span>
-              <div className="space-y-3">
-                {morningTasks.map(renderTaskCard)}
-                {morningTasks.length === 0 && (
-                  <div className="p-8 rounded-2xl border border-dashed border-[#262826] text-center text-xs text-luma-text-dim">
-                    No tasks for Morning
-                  </div>
-                )}
-              </div>
             </div>
-
-            <div className="space-y-4">
-              <span className="text-xs font-mono tracking-widest uppercase text-amber-400 font-bold px-1 flex items-center gap-1.5">
-                <span>☀️ AFTERNOON</span>
-                <span className="text-luma-text-dim font-normal">· {afternoonTasks.length}</span>
-              </span>
-              <div className="space-y-3">
-                {afternoonTasks.map(renderTaskCard)}
-                {afternoonTasks.length === 0 && (
-                  <div className="p-8 rounded-2xl border border-dashed border-[#262826] text-center text-xs text-luma-text-dim">
-                    No tasks for Afternoon
-                  </div>
-                )}
+            {orderedTasks.length === 0 ? (
+              <div className="p-12 rounded-3xl border border-dashed border-[#262826] text-center space-y-2">
+                <div className="text-sm font-semibold text-white">No tasks matching filter</div>
+                <p className="text-xs text-luma-text-dim">Add a new to-do above or adjust the active filter.</p>
               </div>
-            </div>
-
-            <div className="space-y-4">
-              <span className="text-xs font-mono tracking-widest uppercase text-purple-400 font-bold px-1 flex items-center gap-1.5">
-                <span>🌙 EVENING</span>
-                <span className="text-luma-text-dim font-normal">· {eveningTasks.length}</span>
-              </span>
-              <div className="space-y-3">
-                {eveningTasks.map(renderTaskCard)}
-                {eveningTasks.length === 0 && (
-                  <div className="p-8 rounded-2xl border border-dashed border-[#262826] text-center text-xs text-luma-text-dim">
-                    No tasks for Evening
-                  </div>
-                )}
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {orderedTasks.map(renderTaskCard)}
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
